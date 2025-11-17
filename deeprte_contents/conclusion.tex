@@ -1,0 +1,32 @@
+\section{Conclusions}\label{sec:conclusions}
+In this paper, we introduce DeepRTE, a neural operator framework for solving the radiative transfer equation (RTE). By combining an attention-based architecture with operator learning strategy, DeepRTE directly maps input parameters such as boundary conditions, scattering coefficients, and scattering kernels to RTE solutions. Its key innovations include (1) parameter efficiency: achieving higher accuracy than large data-driven models with fewer parameters by encoding physical laws into the architecture; (2) zero-shot generalization: robustly predicting solutions for unseen boundary conditions without retraining; and (3) interpretability: maintaining linear, physically meaningful operations via physics-guided design.
+
+The results of our experiments demonstrate the remarkable
+transfer learning capabilities of DeepRTE.\@ Despite being
+trained on a specific set of boundary conditions, the model
+exhibits strong performance when applied to new boundary
+conditions. The predicted solutions closely match the ground
+truth with low error metrics.
+This ability to generalize to unseen boundary conditions
+highlights the effectiveness of DeepRTE in capturing the
+underlying physical principles of the radiative transport equation.
+Furthermore, the zero-shot performance of DeepRTE is
+particularly impressive. Without any additional training or
+fine-tuning, the model accurately predicts the solution of the
+radiative transport equation for completely new boundary
+conditions. 
+% This zero-shot capability is a testament to the
+% physics-informed architecture of DeepRTE, which enables it to
+% leverage the learned physical principles to make accurate
+% predictions in novel scenarios.
+
+% In conclusion, the transfer learning and zero-shot capabilities
+% of DeepRTE demonstrate its robustness and versatility in
+% solving the radiative transport equation. By leveraging the
+% underlying physical principles learned during training, DeepRTE
+% can accurately predict solutions for new boundary conditions,
+% even in the absence of additional training data. This ability
+% to generalize and adapt to novel scenarios highlights the
+% potential of physics-informed deep learning frameworks in
+% advancing the field of scientific computing.
+In conclusion, DeepRTE shows the power of combining deep learning with physical laws to solve complex scientific problems. Its ability to adapt to new conditions without extra training proves how physics-guided models can achieve accurate, reliable results even in unfamiliar scenarios. This approach not only improves efficiency for solving the radiative transfer equation but also offers a practical template for tackling other challenging equations in science and engineering.

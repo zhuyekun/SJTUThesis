@@ -1,0 +1,208 @@
+% 预备知识：RTE 解算算子的解析结构
+\chapter{预备知识}
+
+本章回顾稳态辐射传输方程（Radiative Transfer Equation, RTE）及其解算算子的基本解析结构，并给出后文将频繁使用的符号与记号。相关结果既为我们构造深度神经网络算子提供理论依据，也帮助理解数值模型中的各个模块含义。
+
+\section{符号与记号}
+
+本文中涉及的主要符号含义如下所示：
+
+\begin{longtable}[c]{c c p{0.72\textwidth}}
+    \toprule
+    记号                            & 部分                          & 含义说明                                                                                                         \\
+    \midrule
+    \endhead
+
+    \midrule
+    \endfoot
+
+    \bottomrule
+    \endlastfoot
+
+    $d$                           & 第~\ref{sec:preliminaries}~节 & 空间维数                                                                                                         \\
+    $D$                           & 第~\ref{sec:preliminaries}~节 & 空间区域，$D\subset\mathbb{R}^d$                                                                                  \\
+    $\partial D$                  & 第~\ref{sec:preliminaries}~节 & 区域 $D$ 的边界                                                                                                   \\
+    $\mathbb{S}^{d-1}$            & 第~\ref{sec:preliminaries}~节 & $\mathbb{R}^d$ 中的单位球面                                                                                        \\
+    $S_{d-1}$                     & 第~\ref{sec:preliminaries}~节 & 单位球面 $\mathbb{S}^{d-1}$ 的表面积，$S_{d-1}=2\pi^{d/2}/\Gamma(d/2)$                                                \\
+    $\br$                         & 第~\ref{sec:preliminaries}~节 & 位置向量                                                                                                         \\
+    $\bOmega$                     & 第~\ref{sec:preliminaries}~节 & 方向单位向量                                                                                                       \\
+    $\bm{v}$                      & 第~\ref{sec:preliminaries}~节 & 速度向量，$\bm{v}=\lvert \bm{v} \rvert \, \bOmega$                                                                \\
+    $I$                           & 第~\ref{sec:preliminaries}~节 & 辐射强度（radiative intensity）                                                                                    \\
+    $I_{-}$                       & 第~\ref{sec:preliminaries}~节 & 入射边界强度，在 $\Gamma_{-}$ 上给定                                                                                    \\
+    $\mu_t$                       & 第~\ref{sec:preliminaries}~节 & 总截面（total cross section）                                                                                     \\
+    $\mu_s$                       & 第~\ref{sec:preliminaries}~节 & 散射截面（scattering cross section）                                                                               \\
+    $\mu_a$                       & 第~\ref{sec:preliminaries}~节 & 吸收截面，$\mu_a=\mu_t-\mu_s$                                                                                     \\
+    $p$                           & 第~\ref{sec:preliminaries}~节 & 散射核或相函数（phase function）                                                                                      \\
+    $\bn(\br)$                    & 第~\ref{sec:preliminaries}~节 & 在 $\br\in\partial D$ 处的外法向单位向量                                                                               \\
+    $\Gamma_{\pm}$                & 第~\ref{sec:preliminaries}~节 & 入/出射边界集合：$\Gamma_{\pm}=\{(\br,\bOmega)\in\partial D\times \mathbb{S}^{d-1}\mid \mp \bn(\br)\cdot\bOmega<0\}$ \\
+    $s$                           & 第~\ref{sec:preliminaries}~节 & 特征线上路径长度参数                                                                                                   \\
+    $s_{-}(\br,\bOmega)$          & 第~\ref{sec:preliminaries}~节 & 从 $\br$ 沿 $-\bOmega$ 方向到达边界的距离                                                                               \\
+    $\tau_{\br,\bOmega}(s_1,s_2)$ & 第~\ref{sec:preliminaries}~节 & 光学厚度：$\tau_{\br,\bOmega}(s_1,s_2):=\int_{s_1}^{s_2} \mu_t(\br-s\bOmega)\,\mathrm{d}s$                        \\
+    $G$                           & 第~\ref{sec:preliminaries}~节 & RTE 的格林函数                                                                                                    \\
+    $\mathcal{A}$                 & 第~\ref{sec:preliminaries}~节 & 解算算子，$\mathcal{A}[I_-]=I$                                                                                    \\
+    $\mathcal{J}$                 & 第~\ref{sec:preliminaries}~节 & 边界衰减算子（attenuation operator）                                                                                 \\
+    $\mathcal{L}$                 & 第~\ref{sec:preliminaries}~节 & 提升算子（lifting operator），沿特征线积分并包含 $\mu_s$                                                                     \\
+    $\mathcal{S}$                 & 第~\ref{sec:preliminaries}~节 & 散射算子（scattering operator）                                                                                    \\
+\end{longtable}
+
+\section{RTE 及解算算子的解析结构}
+\label{sec:preliminaries}
+
+设空间区域为有界 Lipschitz 域 $D\subset\mathbb{R}^d$，其边界为 $\partial D$，外法向单位向量为 $\bn(\br)$。令
+\begin{equation}
+    \Gamma_{\pm} := \{ (\br,\bOmega)\mid \br\in\partial D,\; \bOmega\in\mathbb{S}^{d-1},\; \mp\bn(\br)\cdot\bOmega<0 \},
+\end{equation}
+即 $\Gamma_{-}$ 为入射边界，$\Gamma_{+}$ 为出射边界。辐射强度 $I(\br,\bOmega)$ 满足带入射边界条件的稳态辐射传输方程：
+\begin{equation}\label{eq:rte-with-bc-cn}
+    \begin{aligned}
+        \bOmega\cdot\nabla I(\br,\bOmega) + \mu_t(\br) I(\br,\bOmega)
+                                     & = \frac{\mu_s(\br)}{S_{d-1}} \int_{\mathbb{S}^{d-1}} p(\bOmega,\bOmega^*) I(\br,\bOmega^*)\,\mathrm{d}\bOmega^*, &  & \text{在 } D\times\mathbb{S}^{d-1}, \\
+        I|_{\Gamma_{-}}(\br,\bOmega) & = I_{-}(\br,\bOmega),                                                                                            &  & \text{在 } \Gamma_{-},
+    \end{aligned}
+\end{equation}
+其中 $I_{-}$ 为已知的入射边界数据，$S_{d-1}=2\pi^{d/2}/\Gamma(d/2)$ 为单位球面的面积。
+
+系数函数包括总截面 $\mu_t$、散射截面 $\mu_s$ 以及散射核 $p$。通常定义吸收截面为 $\mu_a = \mu_t - \mu_s$。散射核 $p(\bOmega,\bOmega^*)$ 表示粒子从入射方向 $\bOmega^*$ 散射到方向 $\bOmega$ 的概率密度。我们假设散射核满足互易性，即
+\begin{equation}
+    p(\bOmega,\bOmega^*) = p(\bOmega^*,\bOmega),
+\end{equation}
+并满足归一化条件
+\begin{equation}
+    \frac{1}{S_{d-1}}\int_{\mathbb{S}^{d-1}} p(\bOmega,\bOmega^*) \, \mathrm{d}\bOmega^* = 1,
+    \quad\text{几乎处处对 }\bOmega\in\mathbb{S}^{d-1}.
+\end{equation}
+在许多应用中，还会进一步假设散射核只依赖于散射角，即
+\begin{equation}
+    p(\bOmega,\bOmega^*) = \tilde p(\bOmega\cdot\bOmega^*),
+\end{equation}
+但本文的方法同样适用于一般的散射核。
+
+\subsection{解的存在唯一性与解算算子}
+
+在更一般的情形中，$\mu_t$ 和 $\mu_s$ 可以依赖于位置和速度 $\bm{v}=|\bm{v}|\bOmega$。在适当的“次临界”条件下，可以在 $L^1$、$L^\infty$ 以及一般 $L^p$ 空间中证明 RTE 的解的存在唯一性。这里我们只给出与本文数值设定最相关的结论：
+
+\begin{theorem}[解在 $L^2$ 中的存在唯一性]
+    假设区域 $D$ 有界，设
+    \begin{equation}
+        \mu_a = \mu_t - \mu_s \ge 0, \quad \mu_s \ge 0,
+    \end{equation}
+    且
+    \begin{equation}
+        \|\mu_a\|_{L^\infty(D)}<\infty, \quad \|\mu_s\|_{L^\infty(D)}<\infty,
+    \end{equation}
+    以及散射核满足归一化条件
+    \begin{equation}
+        \frac{1}{S_{d-1}}\int_{\mathbb{S}^{d-1}} p(\bOmega,\bOmega^*)\,\mathrm{d}\bOmega^*=1,\quad \text{几乎处处对 }\bOmega\in\mathbb{S}^{d-1}.
+    \end{equation}
+    则对任意 $I_{-}\in L^2(\partial D\times\mathbb{S}^{d-1})$，带边界条件的 RTE~\eqref{eq:rte-with-bc-cn} 在 $L^2(D\times\mathbb{S}^{d-1})$ 中存在唯一解 $I$，且存在常数 $C>0$（只依赖于 $\operatorname{diam}(D)$、$\|\mu_a\|_{L^\infty(D)}$ 及 $\|\mu_s\|_{L^\infty(D)}$），使得
+    \begin{equation}
+        \|\bOmega\cdot\nabla I\|_{L^2(D\times\mathbb{S}^{d-1})}
+        + \|I\|_{L^2(D\times\mathbb{S}^{d-1})}
+        \le C\,\|I_{-}\|_{L^2(\partial D\times\mathbb{S}^{d-1})}.
+    \end{equation}
+\end{theorem}
+
+在上述假设下，我们可以将~\eqref{eq:rte-with-bc-cn} 的解表示为一个关于输入 $I_{-}$ 及系数函数 $(\mu_t,\mu_s,p)$ 的解算算子：
+\begin{equation}
+    \mathcal{A}:(I_{-};\mu_t,\mu_s,p)\longmapsto I,
+\end{equation}
+即在给定入射边界强度与介质参数的情况下，$\mathcal{A}$ 将其映射为区域内部的辐射强度场 $I$。需要特别指出的是，$\mathcal{A}$ 关于边界数据 $I_{-}$ 是线性的，但关于系数函数 $(\mu_t,\mu_s,p)$ 则是非线性的。
+
+本工作的目标是构造一个高效、精确的数值方法来近似解算算子 $\mathcal{A}$，并在此基础上设计相应的深度神经网络结构。为此，我们需要更细致地分析 $\mathcal{A}$ 的迭代结构。
+
+\subsection{固定点形式与算子分解}
+
+为得到更便于数值实现与网络设计的表达形式，我们首先回顾 RTE 的常规积分形式推导。定义沿特征线的光学厚度
+\begin{equation}\label{eq:optical-depth-cn}
+    \tau_{\br,\bOmega}(s_1,s_2)
+    := \int_{s_1}^{s_2} \mu_t(\br-s\bOmega)\,\mathrm{d}s,
+\end{equation}
+以及从点 $\br$ 沿方向 $\bOmega$ 反向追溯至边界的距离
+\begin{equation}
+    s_{-}(\br,\bOmega) := \inf\{ s\ge 0\mid \br-s\bOmega\in\partial D\}.
+\end{equation}
+
+在只考虑纯衰减、无散射的情形下，$I$ 满足
+\begin{equation}
+    (\bOmega\cdot\nabla+\mu_t) J_b = 0, \quad J_b|_{\Gamma_{-}}=I_{-},
+\end{equation}
+其解可写为
+\begin{equation}\label{eq:attenuation-op-cn}
+    J_b(\br,\bOmega)= \mathcal{J} I_{-}(\br,\bOmega)
+    := \exp\bigl(-\tau_{\br,\bOmega}(0,s_{-}(\br,\bOmega))\bigr)
+    I_{-}(\br-s_{-}(\br,\bOmega)\bOmega,\,\bOmega),
+\end{equation}
+其中算子 $\mathcal{J}$ 体现了沿特征线从边界到内部的指数衰减。
+
+当右端源项为已知的散射源 $\mu_s I$ 时，满足
+\begin{equation}
+    (\bOmega\cdot\nabla+\mu_t) J = \mu_s I, \quad J|_{\Gamma_{-}}=0,
+\end{equation}
+其解可写为
+\begin{equation}\label{eq:lifting-op-cn}
+    J = \mathcal{L} I (\br,\bOmega)
+    := \int_0^{s_{-}(\br,\bOmega)}
+    \exp\bigl(-\tau_{\br,\bOmega}(0,s)\bigr)
+    \mu_s(\br-s\bOmega)\, I(\br-s\bOmega,\bOmega)\,\mathrm{d}s,
+\end{equation}
+这一定义中的算子 $\mathcal{L}$ 可被理解为“提升算子”：它将局部的散射源沿特征线积分，得到在 $D$ 内部的贡献。
+
+另一方面，散射算子定义为
+\begin{equation}\label{eq:scattering-op-cn}
+    \mathcal{S} I(\br,\bOmega)
+    := \frac{1}{S_{d-1}}\int_{\mathbb{S}^{d-1}} p(\bOmega,\bOmega^*) I(\br,\bOmega^*)\,\mathrm{d}\bOmega^*,
+\end{equation}
+它描述了各个方向的辐射通过散射耦合到方向 $\bOmega$ 的过程。
+
+在形式上将算子 $(\bOmega\cdot\nabla+\mu_t)$ 反演，可得到 RTE 的积分算子形式
+\begin{equation}\label{eq:rte-op-form-cn}
+    I = \mathcal{L}\mathcal{S}I + \mathcal{J} I_{-},
+\end{equation}
+这是一个典型的第二类 Fredholm 积分方程，其中 $\mathcal{L}\mathcal{S}I$ 表示散射引起的内部源贡献，$\mathcal{J}I_{-}$ 则反映边界入射的衰减传播。
+
+在适当假设下，可以证明算子 $\mathcal{L}\mathcal{S}$ 在加权 $L^p$ 空间中是收缩算子，从而方程~\eqref{eq:rte-op-form-cn} 存在唯一不动点，并可由固定点迭代
+\begin{equation}\label{eq:fixed-point-iteration-cn}
+    I^{m+1} = \mathcal{L}\mathcal{S} I^{m} + \mathcal{J} I_{-}
+\end{equation}
+收敛得到。当取初值 $I^0 = \mathcal{J} I_{-}$ 时，该迭代等价于经典的源迭代（source iteration）方法。由谱半径估计可知，
+\begin{equation}
+    \rho(\mathcal{L}\mathcal{S}) < 1,
+\end{equation}
+从而解算算子 admit 下面的级数展开：
+\begin{equation}\label{eq:soln-op-series-cn}
+    \mathcal{A}[\mu_t,\mu_s,p] I_{-}
+    = \sum_{n=0}^{\infty} (\mathcal{L}\mathcal{S})^n \, \mathcal{J} I_{-}.
+\end{equation}
+这说明 RTE 的解可以看作是“无数次散射”的叠加，每一次 $\mathcal{L}\mathcal{S}$ 的作用对应一次散射过程。这样的迭代结构与深度神经网络的层级结构在形式上高度相似，为构造高效的神经算子提供了重要启发。
+
+\subsection{格林函数视角}
+
+为了进一步理解解算算子的结构，可以引入 RTE 的格林函数 $G(\br,\bOmega,\br',\bOmega')$，形式上定义为下列问题的（分布意义下）解：
+\begin{equation}\label{eq:rte-greens-function-cn}
+    \begin{aligned}
+        (\bOmega\cdot\nabla+\mu_t) G
+         & = \mu_s \mathcal{S} G,                              &  & \text{在 } D\times\mathbb{S}^{d-1}, \\
+        G|_{\Gamma_{-}}
+         & = \delta_{\{\br'\}}(\br)\,\delta(\bOmega-\bOmega'), &  & \text{在 } \Gamma_{-},
+    \end{aligned}
+\end{equation}
+其中 $(\br',\bOmega')\in\Gamma_{-}$ 视为参数，$\delta_{\{\br'\}}$ 表示在边界 $\partial D$ 上以 $\br'$ 为支撑的 Dirac 分布，$\delta(\bOmega-\bOmega')$ 为方向空间上的 Dirac 函数。此时，RTE 的解可以表示为
+\begin{equation}\label{eq:rte-op-cn2}
+    I(\br,\bOmega)
+    = \int_{\Gamma_{-}} G(\br,\bOmega,\br',\bOmega')\, I_{-}(\br',\bOmega')\,\mathrm{d}\br'\,\mathrm{d}\bOmega'
+    = \mathcal{A}[\mu_t,\mu_s,p] I_{-}(\br,\bOmega).
+\end{equation}
+
+根据前述固定点迭代结构，格林函数可以形式化地写为
+\begin{equation}
+    G(\br,\bOmega,\br',\bOmega')
+    = \sum_{n=0}^{\infty} (\mathcal{L}\mathcal{S})^n
+    \mathcal{J}\bigl(\delta_{\{\br'\}}(\br)\,\delta(\bOmega-\bOmega')\bigr),
+\end{equation}
+进而解算算子可写成
+\begin{equation}
+    \mathcal{A}[\mu_t,\mu_s,p] I_{-}(\br,\bOmega)
+    = \int_{\Gamma_{-}} G(\br,\bOmega,\br',\bOmega')\, I_{-}(\br',\bOmega')\,\mathrm{d}\br'\,\mathrm{d}\bOmega'.
+\end{equation}
+
+从数值角度看，如果介质参数 $(\mu_t,\mu_s,p)$ 被视为固定，则一个直接的思路是用多层感知机（MLP）直接近似格林函数 $G$。然而在实际问题中，$\mu_t$、$\mu_s$ 往往是空间依赖、甚至带有间断的函数，而 $p$ 定义在 $\mathbb{S}^{d-1}\times\mathbb{S}^{d-1}$ 上，$G$ 对这些参数函数的依赖关系十分复杂。若希望训练出的算子能够对一整类 admissible 的 $(\mu_t,\mu_s,p)$ 泛化，则必须在网络结构中显式体现 RTE 解算算子的上述迭代与积分结构。后一章提出的 Deep RTE 算子正是基于这一思路构造的。

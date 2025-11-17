@@ -1,0 +1,295 @@
+\subsubsection{Linearity validation}\label{sec:linearity_val}
+
+Our DeepRTE model architecture is specifically designed to preserve the linearity property with respect to the boundary function $I_{-}$.
+According to \eqref{eq:greens-integral-nn}, the neural network $G^{\text{NN}}$ used in DeepRTE represents the kernel (i.e., the Green's function) of the solution operator $\ANN$ in integral form. Therefore, the overall input-output mapping DeepRTE model remains linear with respect to $I_{-}$ at both continuous and discrete levels.
+
+To verify this claim, we validate the linearity of DeepRTE through numerical experiments that test both additivity and homogeneity properties. All tests below are conducted with fixed cross sections $\mu_t,\mu_s$ and phase function $p$ with the following settings:
+\begin{equation}
+  \mu_t(x,y) =
+  \begin{cases}
+    6, & \text{if } (x,y) \in D_\mu \\
+    10 & \text{if } (x,y) \notin D_\mu
+  \end{cases},
+  \quad
+  \mu_s(x,y) =
+  \begin{cases}
+    3, & \text{if } (x,y) \in D_\mu \\
+    5 & \text{if } (x,y) \notin D_\mu
+  \end{cases},
+  \quad
+  g=0.5, \quad \text{where } D_\mu = [0.4, 0.6]^2.
+\end{equation}
+For simplicity, we write the DeepRTE operator as $\ANN$ instead of $\ANN[\mu_t,\mu_s,p]$. The two fundamental linearity properties are defined as follows:
+
+\textbf{1. Additivity}: The DeepRTE predicted solution corresponding to the sum of two boundary conditions should equals the sum of individual solutions, i.e.,
+\begin{equation}\label{eq:additivity-val}
+  \ANN(I_{-}^{(1)} + I_{-}^{(2)}) = \ANN I_{-}^{(1)} + \ANN I_{-}^{(2)}.
+\end{equation}
+In this test, we set two independent boundary conditions $I_{-}^{(1)}$ and $I_{-}^{(2)}$ chosen from our validation dataset as follows, that is, the incoming boundary conditions are in the form of~\eqref{eq:bc-condition} with variance $\sigma_{\br}=0.01$ and $\sigma_{\bOmega}=0.0075$:
+\begin{equation}
+  I_{-}^{(1)}:
+  \begin{cases}
+    y_l'=0.3875, y_r'=0.6125, x_b'=0.6125, x_t'=0.3875, \\
+    c_l'=0.6931, c_r'=-0.6931, c_b'=0.2871, c_t'=-0.2871, \\
+    s_l'=-0.2871, s_r'=0.2871, s_b'=0.6931, s_t'=-0.6931.
+  \end{cases}
+\end{equation}
+and
+\begin{equation}
+  I_{-}^{(2)}:
+  \begin{cases}
+    y_l'=0.1375, y_r'=0.8625, x_b'=0.8625, x_t'=0.1375, \\
+    c_l'=0.2871, c_r'=-0.2871, c_b'=-0.6931, c_t'=0.6931, \\
+    s_l'=0.6931, s_r'=-0.6931, s_b'=0.2871, s_t'=-0.2871.
+  \end{cases}
+\end{equation}
+We evaluate the MSE error between the left and right sides of~\eqref{eq:additivity-val}, i.e.,
+% \begin{equation}
+%   \|\ANN (I_{-}^{(1)}{+}I_{-}^{(2)}) - ( \ANN I_{-}^{(1)} + \ANN I_{-}^{(2)})\|_2= 1.581\times 10^{-19}.
+% \end{equation}
+\begin{equation}
+  \ell(\ANN (I_{-}^{(1)}{+}I_{-}^{(2)}),\ANN I_{-}^{(1)} + \ANN I_{-}^{(2)})=1.581\times 10^{-19}.
+\end{equation}
+This verifies that the two sides of~\eqref{eq:additivity-val} are nearly identical, thus confirming the additivity property of DeepRTE.
+
+We also compute the MSE and RMSPE between our model predicted solution $\ANN (I_{-}^{(1)}{+}I_{-}^{(2)})$ and the ground truth solution $\A (I_{-}^{(1)}{+}I_{-}^{(2)})$ which is solved using numerical solver. The MSE is $1.358\times10^{-8}$ and the RMSPE is $2.83\%$ which shows that our model can accurately predict the solution for the combined boundary condition $I_{-}^{(1)}{+}I_{-}^{(2)}$. The Fig.~\ref{fig:additivity} visualizes the results of this additivity test using the density defined $\Phi$ in~\eqref{eq:density}.
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}[b]{0.30\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figs/delta_sigma_a3-sigma_t6-g0_5-r5-v9-phi_label.pdf}
+    \caption{Density $\Phi$ of $\ANN (I_{-}^{(1)} + I_{-}^{(2)})$.}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.3\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figs/delta_sigma_a3-sigma_t6-g0_5-r5-v9-phi_pre.pdf}
+    \caption{Density $\Phi$ of $\ANN I_{-}^{(1)} + \ANN I_{-}^{(2)}$}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.3\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figs/delta_sigma_a3-sigma_t6-g0_5-r5-v9-phi_error.pdf}
+    \caption{Absolute error}
+  \end{subfigure}
+  \caption{Additivity verification of DeepRTE with $g=0.5$, $\mus=3$ and $\mut=6$.}
+  \label{fig:additivity}
+\end{figure}
+
+To be more general, we also validate the additivity property on 100 samples of validation dataset with identical distribution to the training dataset with $g=0.5$ mentioned in above section (see Sec.~\ref{sec:acc}). For every sample in dataset with boundary conditions $I_{-}^{(1)}$, we randomly choose another sample with the boundary conditions $I_{-}^{(2)}$, construct new boundary condition $I_{-}^{(1)}{+}I_{-}^{(2)}$ and then use DeepRTE to evaluate the intensity of this three cases, finally compare $\ANN (I_{-}^{(1)}{+}I_{-}^{(2)})$ and $( \ANN I_{-}^{(1)}{+}\ANN I_{-}^{(2)})$. The MSE and RMSPE between two sides of~\eqref{eq:additivity-val} are $1.421\times 10^{-19}$ and $9.20\times10^{-6}\%$ accordingly, see Table~\ref{tab:linearity}.
+
+\textbf{2. Homogeneity}: The predicted solution corresponding to a scaled boundary condition is the scaled solution:
+\begin{equation}\label{eq:homogeneity-val}
+  \ANN(\alpha I_{-}) = \alpha \ANN I_{-}, \quad \text{for any } \alpha \in \mathbb{R}.
+\end{equation}
+Similar to the additivity test, one of the example boundary condition $I_{-}$ chosen from our validation dataset as follows,
+\begin{equation}
+  I_{-}:
+  \begin{cases}
+    y_l'=0.3875, y_r'=0.6125, x_b'=0.6125, x_t'=0.3875, \\
+    c_l'=0.6931, c_r'=-0.6931, c_b'=0.2871, c_t'=-0.2871, \\
+    s_l'=-0.2871, s_r'=0.2871, s_b'=0.6931, s_t'=-0.6931,
+  \end{cases}
+\end{equation}
+with variance $\sigma_{\br}=0.01$, $\sigma_{\bOmega}=0.0075$ and
+\begin{equation}
+  \alpha=5.
+\end{equation}
+The MSE error between the left and right sides of~\eqref{eq:homogeneity-val} is:
+% \begin{equation}
+%   \|\ANN (\alpha I_{-}) - \alpha \ANN I_{-}\|_2= 5.179\times 10^{-13}.
+% \end{equation}
+\begin{equation}
+  \ell(\ANN (\alpha I_{-}), \alpha \ANN I_{-}) = 5.179\times 10^{-13}.
+\end{equation}
+This verifies that the two sides of~\eqref{eq:homogeneity-val} are nearly identical, thus confirming the homogeneity property of
+DeepRTE.
+
+We also report the MSE and RMSPE between predicted $\A^\text{NN} (\alpha I^-)$ and ground truth solution solved by numerical solver $\A I^-$ is $5.842\times10^{-9}$ and $2.19\%$ accordingly. This shows that our model can accurately predict the solution for the scaled boundary condition $\alpha I^-$. The Fig.~\ref{fig:homogeneity} visualizes the results of this homogeneity test using the density $\Phi$ defined  in~\eqref{eq:density}
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}[b]{0.3\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figs/delta-sigma_a3_sigma_t6-g0_5-r15-v3-phi_label.pdf}
+    \caption{Density $\Phi$ of $\ANN (\alpha I_{-})$.}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.3\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figs/delta-sigma_a3_sigma_t6-g0_5-r15-v3-phi_pre.pdf}
+    \caption{Density $\Phi$ of $\alpha \ANN I_{-}$}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.3\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figs/delta-sigma_a3_sigma_t6-g0_5-r15-v3-phi_error.pdf}
+    \caption{Absolute error}
+  \end{subfigure}
+  \caption{Homogeneity verification with $g=0.5$, $\mus=3$, $\mut=6$ and $\alpha=5$.}\label{fig:homogeneity}
+\end{figure}
+
+To be more general, we also validate the homogeneity property on $100$ samples of validation dataset with identical distribution to the training dataset with $g=0.5$ mentioned in above section (see Sec.~\ref{sec:acc}). In homogeneity test, scale factor $\alpha \sim \mathcal{U}(0,5)$, we multiply this random scale factor with each origin boundary condition $I_-$, and compare the $\ANN (\alpha I^-)$ and $\alpha \ANN I^-$. The MSE and RMSPE between two sides of~\eqref{eq:homogeneity-val} are $2.804\times 10^{-13}$ and $1.01\times 10^{-5}\%$ accordingly, see Table~\ref{tab:linearity}.
+\begin{table}[htbp]
+  \centering
+  \begin{tabular}{lcc}
+    \toprule
+    & MSE  & RMSPE($\%$)  \\
+    \midrule
+    Additivity & $1.421\times 10^{-19}$  & $9.20\times 10^{-6}$ \\
+    Homogeneity & $2.804\times 10^{-13}$  & $1.01\times 10^{-5}$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Additivity and homogeneity verification in $100$ samples of validation dataset with identical distribution to the training dataset with $g=0.5$ mentioned in above section (see Sec.~\ref{sec:acc}).}
+  \label{tab:linearity}
+\end{table}
+
+\textbf{3. Linearity combination}:
+The linearity of $\ANN$ established above implies that the generalization error for an arbitrary inflow $I_-$ can be decomposed exactly as in the proof of Theorem~\ref{thm:error-estimate} (see also Eq.~\ref{eq:error_estimate}). In this subsection we design a numerical experiment to empirically verify this decomposition and to assess the relative magnitudes of the constituent terms.
+
+% Our goal is to choose an inflow boundary condition not explicitly present in the training set, which means, approximate it by the particle (delta-function) dataset described in Sec.~\ref{thm:bc-error-estimate}, and measure each term appearing on the right-hand side of the theoretical estimate in Theorem~\ref{thm:error-estimate}.
+
+% To numerically compare the error, we introduce a high-resolution reference discrete solver $\A^{\text{ref}}$ (i.e. fast sweeping), If $\A^{\text{ref}}$ is a bounded linear operator, Theorem~\ref{thm:error-estimate} is also holds for $\A^{\text{ref}}$ and $\ANN$ (see the proof of Theorem~\ref{thm:error-estimate}).
+% \begin{equation}\label{eq:triangle-A-Aref-ANN}
+%     \| (\A - \ANN) I_- \|_{L^2} \leq \| (\A - \A^{\text{ref}}) I_- \|_{L^2} + \| (\A^{\text{ref}} - \ANN) I_- \|_{L^2}
+% \end{equation}
+% Consequently, once $\A^{\text{ref}}$ is convergent to $\A$ and the network accurately regresses $\A^{\text{ref}}$, the total error has a upper bound. If there exist $\varepsilon_{\text{ref}}(h)$ such that
+% \begin{equation}
+%     \| (\A - \A^{\text{ref}}) I_- \|_{L^2} \le \varepsilon_{\text{ref}},
+% \end{equation}
+% then \eqref{eq:triangle-A-Aref-ANN} immediately yields
+% \begin{equation}
+%     \| (\A - \ANN) I_- \|_{L^2} \le \varepsilon_{\text{ref}} + \| (\A^{\text{ref}} - \ANN) I_- \|_{L^2}.
+% \end{equation}
+% \begin{equation}
+% \begin{aligned}
+%           \| (\ANN - \A) I_- \|_{L^2} \; &\leq \varepsilon_{\text{ref}} + C \|I_- - I_{-,\sigma}^{N_{\text{bc}}}\|_{L^2(\Gamma_-)} + \sum_{i,j}|w_{ij}|\,\|(\ANN-\A^{\text{ref}})\delta_{\{\br_i\}}^{\sigma_{\br}}(\br) \delta^{\sigma_{\bOmega}}(\bOmega-\bOmega_j))\|_{L^2},
+% \end{aligned}
+% \end{equation}
+% \begin{equation}
+% \begin{aligned}
+%           \| (\ANN - \A) I_- \|_{L^2} \; &\leq  C \|I_- - I_{-,\sigma}^{N_{\text{bc}}}\|_{L^2(\Gamma_-)} + \sum_{i,j}|w_{ij}|\,\|(\ANN-\A^{\text{ref}})\delta_{\{\br_i\}}^{\sigma_{\br}}(\br) \delta^{\sigma_{\bOmega}}(\bOmega-\bOmega_j))\|_{L^2},
+% \end{aligned}
+% \end{equation}
+% where $C$ depends on the operator norms of $\A^{\text{ref}}$ and $\ANN$, see the proof of Theorem~\ref{thm:error-estimate}.
+
+To numerically compare the error, for example, we consider a smooth inflow imposed only on the left boundary and zero elsewhere:
+\begin{equation}
+  \left \{ % tex-fmt: skip
+  \begin{aligned}
+    & I_-(x=0,y,c>0,s) = \sin(\pi y), \\
+    & I_-(x=1,y,c<0,s) = 0,           \\
+    & I_-(x,y=0,c,s>0) = 0,           \\
+    & I_-(x,y=1,c,s<0) = 0.
+  \end{aligned}
+  \right. % tex-fmt: skip
+\end{equation}
+
+Following Eq.~\eqref{eq:particle-approx} and Eq.~\eqref{eq:delta_defination}, we only need to approximate the left boundary condition as follows:
+\begin{equation}
+  I_-(x=0,y,c>0,s) = \sin(\pi y) \approx \sum_{i=0}^{39} w_{i} \delta^{\sigma_{\br}}_{\{y_i\}}(y),
+\end{equation}
+where $\{y_i\}$ are the centers of uniform discrete cells, $g=0.5$, $\sigma_{\br} = 0.01$. And according to ~\cite{chertock2017practical} Section 2.1,
+\begin{equation}
+  w_i=\frac{1}{40}\sin(\pi y_i).
+\end{equation}
+
+To empirically verify the error estimate in Theorem~\ref{thm:error-estimate}, we use numerical solution as the reference solution $I^{\text{ref}}$ and measure the following errors (note all $L^2$ errors are computed by replacing integrals with quadrature over the discrete spatial--angular grid), starting from the regularized delta function approximation error:
+\begin{equation}
+  \|I_{-} - I^{40}_{-,0.01}\|_{L^2} \approx \frac{1}{160}\|I_{(x=0,y,c>0,s)} - \sum_{i=0}^{39} w_{i} \delta^{\sigma_{\br}}_{\{y_i\}}(y)\|_{\ell^2}=4.799\times 10^{-5},
+\end{equation}
+and then
+\begin{equation}
+  \|\ANN_{\theta^*}(I_{-} - I^{40}_{-,0.01})\|_{L^2}\approx 2.190\times 10^{-7}, \quad
+  \|\A(I_{-} - I^{40}_{-,0.01})\|_{L^2} \approx 2.208\times 10^{-7},
+\end{equation}
+and finally the generalization error
+\begin{equation}
+  \|(\ANN_{\theta^*} - \mathcal{A}) I^{40}_{-,0.01}\|_{L^2}
+  =\|\sum_{i=0}^{39}w_i(\ANN_{\theta^*} - \mathcal{A}) \delta^{\sigma_{\br}}_{\{y_i\}}(y)\|_{L^2} \leq \sum_{i=0}^{39}|w_i|\|(\ANN_{\theta^*} - \mathcal{A}) \delta^{\sigma_{\br}}_{\{y_i\}}(y)\|_{L^2} \approx 8.385\times 10^{-5},
+\end{equation}
+So the total error is bounded by $8.385\times 10^{-5}$.
+We also calculate the direct inference error as
+\begin{equation}
+  \|(\ANN_{\theta^*} - \mathcal{A}) I_{-}\|_{L^2} \approx 1.888\times 10^{-5}.
+\end{equation}
+This is lower than our theoretical bound which verifies our results.
+
+% From above two properties, we can conclude that for any linear combination of boundary conditions, the DeepRTE predicted solution satisfies:
+% \begin{equation}
+%   \ANN\left(\sum_{i=1}^{n} \alpha_i I_{-}^{(i)}\right) = \sum_{i=1}^{n} \alpha_i \ANN I_{-}^{(i)}, \quad \text{for any } \alpha       _i \in \mathbb{R}, n \in \mathbb{N}^+.
+% \end{equation}
+% This is a direct consequence of the additivity and homogeneity properties.
+% This property is particularly useful in practical applications where complex boundary conditions can be decomposed into simpler components. By training the DeepRTE model on a set of fundamental boundary conditions, it can effectively generalize to more complex scenarios through linear combinations.
+
+% We use numerical experiments to verify this. Only considering the left boundary as $\sin$ function:
+% \begin{equation}
+%   \left \{ % tex-fmt: skip
+%   \begin{aligned}
+%     & I_-(x=0,y,c>0,s) = \sin{\pi y},   \\
+%     & I_-(x=1,y,c<0, s) = 0, \\
+%     & I_-(x,y=0,c,s>0) =0,   \\
+%     & I_-(x,y=1,c,s<0) =0,
+%   \end{aligned}
+%   \right. % tex-fmt: skip
+% \end{equation}
+% Substitute above $I_-$ to $f$, we can obtain that
+% \begin{equation}
+%   \begin{aligned}
+%     I_-(\br, \bOmega) \approx I^{N_{\text{bc}}}_{-,\sigma} := \sum_{i,j}^{N_\text{bc}} w_{ij} I_-(\br, \bOmega)\frac{1}{\sigma_{\br} \sqrt{\pi}} \exp\left( -\frac{{(\br-\br_i)}^2}{\sigma_{\br} ^2}\right) \frac{1}{\sigma_{\bOmega} \sqrt{\pi}} \exp\left( -\frac{{(\bOmega-\bOmega_j)}^2}{\sigma_{\bOmega} ^2} \right),
+%   \end{aligned}
+% \end{equation}
+% setting $\sigma_{\br} = 0.01$, $\sigma_{\bOmega} = 0.0075$ and $g=0.5$.
+% For the right-hand side terms in Eq.~\ref{eq:error_estimate}, we obtain the following numerical results:
+% \begin{equation}
+%   \begin{aligned}
+%     &\ell(I_-,I^{N_{\text{bc}}}_{-,\sigma}) = 1.474\times10^{-6}, \\
+%     &\ell(\A^{\text{NN}}( I_-, I^{N_{\text{bc}}}_{-,\sigma})) = 1.841\times10^{-9}, \\
+%     \sum^{N_{\text{bc}}}_{(\br_i,\bOmega_j)\in \Gamma_-}w_{ij}f_{ij}&\|(\A ^{\text{NN}}-\A) \delta^{\sigma}_{\{\br'\}}(\br)\delta^{\sigma}(\bOmega-\bOmega')\|_2 = 3.132\times10^{-10}, \\
+%     &\| \A^{\text{ref}}( I_- - I^{N_{\text{bc}}}_{-,\sigma})\|_2 = 1.872\times10^{-9}.
+%   \end{aligned}
+% \end{equation}
+% Here, $\A^{\text{ref}}$ denotes the reference numerical operator implemented via the sweeping method.
+
+% Based on the boundedness discussed previously, we conclude that the error between the traditional sweeping-based operator and DeepRTE is well-controlled in this case.
+% % \begin{table}[htbp]
+% %   \centering
+% %   \begin{tabular}{@{}lc@{}}
+% %     \toprule
+% %      & MSE \\
+% %     \midrule
+% %     % $\|\sin \br - \sum_{i,j} w_{ij}\sin(\br_i)\delta_{\br}\delta_{v}\|_2$ & $1.474\times10^{-6}$ \\
+% %     $\|\A(\sin \br - \sum_{i,j} w_{ij}\sin(\br_i)\delta_{\br}\delta_{\bOmega})\|_2$ & $1.841\times10^{-9}$ \\
+% %     $\|\sum_{i,j} w_{ij}\sin(\br_i)(\A-\A^{\text{NN}})\delta_{\br}\delta_{\bOmega}\|_2$ & $3.132\times10^{-10}$ \\
+% %     \bottomrule
+% %   \end{tabular}
+% %   \caption{}
+% %   \label{tab:error_decomp}
+% % \end{table}
+
+% % \begin{figure}[htbp]
+% %   \centering
+% %   % \begin{subfigure}[b]{0.24\textwidth}
+% %   %   \centering
+% %   %   \includegraphics[width=\textwidth]{figs/delta_sigma_a3-sigma_t6-g0_5-r5-v9-phi_label_3d.pdf}
+% %   %   \caption{$\Phi_{\text{label}}$ (3D)}\label{fig:caseII_label_3d}
+% %   % \end{subfigure}
+% %   % \hfill
+% %   \begin{subfigure}[b]{0.30\textwidth}
+% %     \centering
+% %     \includegraphics[width=\textwidth]{figs/test_sinx_label.pdf}
+% %      \caption{Density of prediction which boundary condition is $\sin$}
+% %   \end{subfigure}
+% %   \hfill
+% %   \begin{subfigure}[b]{0.3\textwidth}
+% %     \centering
+% %     \includegraphics[width=\textwidth]{figs/test_sinx_pre.pdf}
+% %     \caption{A linear combination of predicted densities whose boundary condition is a delta function included in our training dataset.}\label{fig:caseII_predict}
+% %   \end{subfigure}
+% %   \hfill
+% %   \begin{subfigure}[b]{0.3\textwidth}
+% %     \centering
+% %     \includegraphics[width=\textwidth]{figs/test_sinx_error.pdf}
+% %     \caption{Absolute error}\label{fig:additivity}
+% %   \end{subfigure}
+% %   \caption{Evaluation dataset with scattering kernel coefficient $g=0.5$, $\mus=3$, $\mut=6$. MSE is $1.565\times10^{-11}$ and RMSPE is $8.916\times10^{-5}$}
+% % \end{figure}

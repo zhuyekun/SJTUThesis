@@ -1,0 +1,526 @@
+\section{Network architecture}\label{sec:architecture}
+Our goal is to learn the following solution operator for RTE:
+\begin{equation}\label{eq:solution-op}
+	\ANN \approx \A: (I_{-}; \mut, \mus, p) \rightarrow I,
+\end{equation}
+on a fixed bounded domain $D$ and for simplicity we will drop $D$ dependence in the following discussion see Remark~\ref{remk:geometry-adaptation}.
+More specifically, the solution operator $\ANN$ is represented by the integral of its distribution kernel, i.e., Green's function defined in~\eqref{eq:rte-op}
+\begin{equation}\label{eq:greens-integral-nn}
+	I(\br, \bOmega)\approx I^\text{NN}(\br,\bOmega) = \ANN[\mut,\mus,p] I_{-} = \int_{\Gamma_-} G^{\text{NN}}(\br, \bOmega, \br', \bOmega') I_{-}(\br', \bOmega') \diff{\br'} \diff{\bOmega'},
+\end{equation}
+where $G^{\text{NN}}$ is the Green's function parametrized by the deep neural networks.
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=1\textwidth]{architecture.pdf}
+	\caption{DeepRTE network architecture. The diagram illustrates the alterations in various inputs throughout the process. Attenuation Module processes phase coordinates and coefficients to approximate operators $\J$, $\cL$, followed by Scattering Module handling angular quadrature evaluations for operator iterations. Ultimately the Green's function $G^{\text{NN}}$ is multiplied by the boundary conditions and integrated over $\Gamma_-$  to compute radiation field.}\label{fig:arch-overview}
+\end{figure}
+The overall structure of DeepRTE is shown in Fig.~\ref{fig:arch-overview}, which is formed by modules inspired by the iterative process in~\eqref{eq:greens-function-iterations} to some finite steps.
+The input features include:
+\begin{itemize}\label{list:attenuation-inputs}
+	\item $(\br,\bOmega)$: interior phase coordinate at which the solution needs to be evaluated;
+	\item $(\br',\bOmega')$: the phase coordinates belong to $\Gamma_-$ that are used to compute the integration in~\eqref{eq:greens-integral-nn} by some given quadrature rule;
+	\item $\{{(\mu_t^{\text{mesh}})}_i=\mu_t(\br^{\text{mesh}}_i)\}$, $\{{(\mu_s^{\text{mesh}})}_i=\mu_s(\br^{\text{mesh}}_i)\}$, $\{\br^{\text{mesh}}_i\}$: spatial dependent total cross section and scattering cross section, and the corresponding coordinates of the spatial mesh points. Here the mesh is not necessary to be uniform, it can be structured or unstructured.
+\end{itemize}
+These features are fed into the \textbf{Attenuation module}, which takes into account the dependence of the function $\mut$ and $\mus$.
+The output of the Attenuation module is then combined with the following features:
+\begin{itemize}
+	\item  $\{p(\bOmega, \bOmega^*_i)\}$, $\{\omega_i\}$: phase/scattering function $p$ evaluated on any angle $\bOmega$, quadrature points $\bOmega^*_i$ and the corresponding quadrature weights $\omega_i$;
+	\item  $\{p(\bOmega^*_i, \bOmega^*_j)\}$, $\{\omega_j\}$: phase/scattering function $p$ evaluated on quadrature points $(\bOmega^*_i, \bOmega^*_j)$, needed for the computation of residual connection in the network.
+	      % \textcolor{blue}{ \item  $\{{(\mu_s^{\text{mesh}})}_i=\mu_s(\br^{\text{mesh}})\}$:  spatial dependent scattering coefficients.}
+\end{itemize}
+are fed into the \textbf{Scattering module} which simulates the iterative process \eqref{eq:fixed-point-iteration}.
+Finally, the outputs of the scattering module is then projected to the scalar Green's function $G^{\text{NN}}$ by a linear layer, One can then multiply $G^{\text{NN}}$ with the boundary condition $I_{-}(\br',\bOmega')$, and integrate over the boundary phase coordinates $(\br',\bOmega')$ to obtain the solution $I$ on any phase point $(\br,\bOmega)$.
+
+As a summary we put the whole process into the Alg.~\ref{alg:green-function}. The detailed description of the key ideas and components is provided in following subsections.
+\begin{algorithm}[H]
+	\caption{Green's Function}\label{alg:green-function}
+	\vspace{0.5em}
+	\Def$\text{ GreenFunction}(\br,\bOmega,\br^{\prime},\bOmega^{\prime},\{\br_i^{\text{mesh}}\}, \{{(\mut^{\text{mesh}})}_i\},\{{(\mus^{\text{mesh}})}_i\},\{p(\bOmega,\bOmega^*_i)\},\{p(\bOmega^*_i,\bOmega^*_j)\}, \{\omega_j\})$:
+	\begin{algorithmic}[1]
+		\vspace{0.5em}
+		\Comment{Output of attenuation module in latent space}
+		\vspace{0.5em}
+		\State$\bm{g}=\hyperref[alg:attenuation-module]{\text{AttenuationModule}}(\br,\bOmega,\br^{\prime},\bOmega^{\prime},\{\br_i^{\text{mesh}}\},\{{(\mut^{\text{mesh}})}_i\},\{{(\mus^{\text{mesh}})}_i\})$ \hfill $\bm{g}\in \mathbb{R}^{d_{\text{model}}}$
+		\vspace{0.5em}
+		\Comment{Output of the attenuation module at angular quadrature points are also needed}
+		\vspace{0.5em}
+		\State$\{\bm{g}^*_j\}=\hyperref[alg:attenuation-module]{\text{AttenuationModule}}(\br,\{\bOmega_j^*\},\br^{\prime},\bOmega^{\prime},\{\br_i^{\mathrm{mesh}}\},\{{(\mut^{\mathrm{mesh}})}_i\}, \{{(\mus^{\mathrm{mesh}})}_i\})$ \hfill $\bm{g}^*_j\in \mathbb{R}^{d_{\text{model}}}$
+		\vspace{0.5em}
+		\Comment{Scattering module}
+		\vspace{0.5em}
+		\State$\bm{g}\gets\hyperref[alg:scattering-module]{\text{ScatterringModule}}(\bm{g}, \{\bm{g}^*_j\}, \{p(\bOmega,\bOmega^*_i)\},\{p(\bOmega^*_i,\bOmega^*_j)\}, \{\omega_j\})$ \hfill $\bm{g}\in \mathbb{R}^{d_{\text{model}}}$
+		\vspace{0.5em}
+		\Comment{Final output are projeted to the scalar Green's function}
+		\vspace{0.5em}
+		\State$g = \text{LinearNoBias}(\bm{g})$ \hfill $g\in\mathbb{R}$
+		\vspace{0.5em}
+		\Ret$g$
+	\end{algorithmic}
+\end{algorithm}
+
+\begin{remark}\label{remk:geometry-adaptation}
+	We remark that our current implementation of DeepRTE learns the solution operator for a specific geometry. Like other mainstream operator learning frameworks, when the geometry changes, the model theoretically requires retraining from scratch. However, several strategies can mitigate this limitation:
+
+	One can train the model on a regular domain (e.g., the square domain used in our experiments) that encompasses all possible target geometries. The boundary conditions can then be appropriately extended to this regular domain. When applying to new geometries within this encompassing domain, the trained model can be used directly without retraining.
+
+	Another approach involves using neural networks as encoder and decoder to map various geometries to a fixed latent domain and vice versa. The DeepRTE model is trained on this latent domain. For new geometries, transfer learning can fine-tune the encoder, decoder, and model components using limited data.
+\end{remark}
+
+\subsection{Attenuation module}\label{sec:attenuation-module}
+
+The Attenuation module utilizes a neural network to provide a discrete representation of the Green's function of the operator $\J$ and $\cL$.
+The Green's function for the operator $\J$ and $\cL$ can be unified as follows
+\begin{equation}\label{eq:L-op}
+	\int_0^{s_{-}(\br, \bOmega)} e^{-\tau_{\br,\bOmega}(0,s)}u(\br-s\bOmega, \bOmega)\diff{s},
+\end{equation}
+with $u(\br, \bOmega)=\mus(\br)I(\br, \bOmega)$ for $\cL$ and $u(\br, \bOmega)=I_-(\br-s_-\bOmega, \bOmega)\delta_{\{s\}}(s_-)$ for $\J$. This implies that it is important to have a representation of the Green's function along the characteristic line $\br-s \bOmega$. %as specified in~\eqref{eq:attenuation-op}.
+In our architectural framework, % the attenuation module utilizes a neural network to approximate discretely approximate the initial state vector along characteristic lines. This approximation
+along the characteristic line, the discrete representation of dimension $d_{\text{model}}$ is expressed as:
+% \begin{equation}
+%   \bG^{\text{NN}} = {(G^{0}, \cL G^{0}, \ldots, \cL^{d_{\text{model}}-1}G^{0})}^{\transpose} \in  \mathbb{R}^{d_\text{model}},
+% \end{equation}
+\begin{equation}
+	\bG^{\text{NN}} =
+	\begin{pmatrix}
+		G(\br-s_1 \bOmega, \bOmega; \br', \bOmega') \\
+		\vdots                                      \\
+		G(\br-s_{d_{\text{model}}} \bOmega, \bOmega; \br', \bOmega')
+	\end{pmatrix}\in \mathbb{R}^{d_{\text{model}}}.
+\end{equation}
+
+The parameter $d_{\text{model}}$ represents the dimension of the discrete representation, which is the number of sampling points along the characteristic line. Each component $G(\br-s_i \bOmega, \bOmega; \br', \bOmega')$ with $s_i\in (0,s_-(\br,\bOmega))$, corresponds to the Green's function's evaluation at a point on the characteristic line. It is important to note that the particular values of $s_i$ are not explicitly used in the NN construction. This representation effectively captures the essential attenuation characteristics while maintaining computational tractability through dimension reduction.
+
+% We do not directly learn $\cL$ because $\cL$ inherently involves information along the characteristic line, and aggregating such information is computationally expensive. Repeated application of $\cL$ would significantly increase the computational load. Hence, we employ an MLP to directly integrate the effects of $\cL$, $\cL^2$, $\cL^3$, \ldots, so that subsequent iterative steps do not require explicit computation along the characteristic line.
+
+The neural network output $\bG^{\text{NN}}$ depends on the phase space coordinates $(\br,\bOmega)$ and $(\br',\bOmega')$, along with $\mut$.
+For implementation, we construct a neural network architecture with:
+\begin{equation}\label{G_equation}
+	\bG^{\text{NN}}(\br,\bOmega,\br^{\prime},\bOmega^{\prime}; \mut) =\text{MLP}\left(\br,\bOmega,\br^{\prime},\bOmega^{\prime},\tau_-^{\text{NN}}\right),
+\end{equation}
+where the optical depth $\tau_-^{\text{NN}}$ is computed by a specialized subnetwork called OpticalDepthNet. OpticalDepthNet learns how the total cross section $\mut$ determines the optical depth in complex ways, which takes into account how the function $\mu_t$ effects the Green's function.
+The final Multi-layer perceptrons (MLP) combines all this information to predict the transport behavior.
+
+The structure of the attenuation module is shown in Fig.~\ref{fig:attenuation-module} and Alg.~\ref{alg:attenuation-module}. The detailed description of $\tau_-^{\text{NN}}$, i.e., the OpticalDepthNet is provided in the following subsection.
+\begin{figure}
+	\centering
+	\includegraphics[width=1\textwidth]{attenuation_module.pdf}
+	\caption{
+		Attenuation module architecture. The network takes as input the spatial coordinates ($\br,\br'$), angular variables ($\bOmega,\bOmega'$), and cross sections ($\mut,\mus$). The OpticalDepthNet submodule first computes the optical depth $\tau_-^{\text{NN}}$ along the characteristic line. These features are then processed by an MLP to produce the truncated Green's function representation $\bG^{\text{NN}}\in\mathbb{R}^{d_{\text{model}}}$, which samples the radiation field at discrete points $\br-s_i\bOmega$ (circles along characteristic line). This architecture efficiently captures both local scattering effects and non-local attenuation while maintaining computational tractability through dimension reduction.
+	}\label{fig:attenuation-module}
+\end{figure}
+\begin{algorithm}[H]
+	\caption{Attenuation Module}\label{alg:attenuation-module}
+	\vspace{0.5em}
+	$
+		\begin{aligned}
+			\Def \text{ AttenuationModule}(
+			 & \br,\bOmega,\br^{\prime},\bOmega^{\prime},\{\br_i^{\text{mesh}}\},\{{(\mut^{\text{mesh}})}_i\},\{{(\mus^{\text{mesh}})}_i\}, \\
+			 & N_{\text{mlp}}=4,d_{\text{mlp}}=128,d_{\text{model}}=16):
+		\end{aligned}$
+	\begin{algorithmic}[1]
+		\vspace{0.5em}
+		\Comment{Optical depth network}
+		\vspace{0.5em}
+		\State$\tau_{-}^{\text{NN}} = \hyperref[alg:optical-depth-net]{\text{OpticalDepthNet}}(\br,\bOmega,\{\br_i^{\text{mesh}}\},\{{(\mut^{\text{mesh}})}_i\},\{{(\mus^{\text{mesh}})}_i\}, d_k=12, H=2)$
+		\vspace{0.5em}
+		\State$\bm{z} = \text{concat}(\br, \bOmega, \br^{\prime}, \bOmega^{\prime}, e^{-\tau_{-}^{\text{NN}}})$
+		\vspace{0.5em}
+		\Comment{MLP}
+		\vspace{0.5em}
+		\ForAll{$l\in[1,\ldots,N_{\text{mlp}-1}]$}
+		\vspace{0.5em}
+		\State$\bm{z}\gets\text{tanh}(\text{Linear}(\bm{z}))$ \hfill $\bm{z} \in \mathbb{R}^{d_{\text{mlp}}}$
+		\vspace{0.5em}
+		\EndFor%
+		\vspace{0.5em}
+		\Comment{Output projection}
+		\vspace{0.5em}
+		\State$\bm{g} = \text{Linear}(\bm{z})$ \hfill $\bm{g} \in \mathbb{R}^{d_{\text{model}}}$
+		\vspace{0.5em}
+		\Ret$\bm{g}$
+	\end{algorithmic}
+\end{algorithm}
+
+\subsubsection{Optical depth network}
+The Optical Depth Network is designed to capture the influence of $\mut$ along the characteristic line. Traditional methods for performing integration along the characteristic line often encounter significant challenges. For example, by noting \eqref{eq:optical-depth}, if we want to determine the optical depth which is defined by
+\begin{equation}
+	\tau_{-,t}(\br,\bOmega):=\tau(0, s_-(\br, \bOmega))=\int^{s_-(\br, \bOmega)}_{0} \mut(\br-s\bOmega) \diff{s},
+\end{equation}
+the numerical evaluation of the integration
+along the characteristic line for each $(\br,\bOmega)$ is computationally expensive and sometimes even impossible for very complex spatial geometry.
+
+By incorporating the \emph{multi-head attention along the characteristic line}, our proposed OpticalDepthNet, once trained, can approximate $\tau_{-,t}(\br,\bOmega)$ for a given geometry at any phase point $(\br,\bOmega)$. It uses multi-head attention as follows:
+\begin{equation}\label{eq:optical-depth-net}
+	\tau_{-,t}^{\text{NN}} = \text{OpticalDepthNet}\left(\br,\bOmega; \{\br^{\text{mesh}}_i\}, \{{(\mu_t^{\text{mesh}})}_i\}\right) = \text{MultiHead}(Q, K, V),
+\end{equation}
+where $\{\br^{\text{mesh}}_i\}$ are the spatial mesh where the total cross section $\mu_t(\br)$ takes values $\{{(\mu_t^{\text{mesh}})}_i\}$ on. It is important to note that $\{\br^{\text{mesh}}_i\}$ only considers the spatial dependence of $\mu_t$, but it does not necessarily coincide with the locations where the numerical solution $I$ is evaluated. This means that $\{\br^{\text{mesh}}_i\}$ can be very coarse, especially if  $\mu_t$ is, for example, piece-wise constant.
+We will first describe the structure of the multi-head attention mechanism, define its inputs $Q$, $K$ and $V$ and then explain the motivation behind using multi-head attention in the next subsection.
+
+In the context of deep learning, the inputs of multi-head attention $Q$, $K$ and $V$ are often called \emph{queries, keys, values} respectively. They are defined as follows:
+\begin{equation}
+	Q = (\br, \bOmega)\in \mathbb{R}^{1\times 2d}, \quad
+	K =
+	\begin{pmatrix}
+		\vdots                               \\
+		{(\br^\text{mesh}_{\text{local}})}_i \\
+		\vdots
+	\end{pmatrix}\in\mathbb{R}^{N_\text{mesh} \times 2},
+	\quad
+	V =
+	\begin{pmatrix}
+		\vdots                    \\
+		{(\mu_t^{\text{mesh}})}_i \\
+		\vdots
+	\end{pmatrix}\in\mathbb{R}^{N_\text{mesh}\times 1},
+\end{equation}
+where $K$'s $i$-th entry ${(\br_{\text{local}})}_i=\left({(r_\text{local})}_i, {(\theta_\text{local})}_i\right)$ is the local coordinates on the characteristic line of the phase point $(\br,\bOmega)$, which is a straight line in direction $\bOmega$ and passing through the spatial point $\br$.
+By projecting the $\br^\text{mesh}_i$ onto the characteristic line, one has
+\begin{equation}
+	\begin{aligned}
+		{(\br^\text{mesh}_{\text{local}})}_i
+		 & =\text{RelativePositionEncoding}(\br,\bOmega,\br^\text{mesh}_i)                        \\
+		 & = \left({(r^\text{mesh}_\text{local})}_i, {(\theta^\text{mesh}_\text{local})}_i\right)
+		= \left((\br-\br^{\text{mesh}}_i)\cdot\bOmega, \frac{(\br-\br^{\text{mesh}}_i)}{
+			\| \br-\br^{\text{mesh}}_i\|}\cdot \bOmega\right).
+	\end{aligned}
+\end{equation}
+Then the multi-head attention is quite standard in deep learning,
+\begin{equation}
+	\text{MultiHead}(Q, K, V) = \text{Concat}(\text{head}_1,\ldots,\text{head}_H)W^\tau,
+\end{equation}
+where for $h=1,\ldots,H$, the $h$-th head is computed as
+\begin{equation}
+	\begin{aligned}
+		\text{head}_h = \text{Attention}(QW_h^Q, KW_h^K, VW_h^V)
+		= \text{softmax}\left(\frac{(QW_h^Q){(KW_h^K)}^T}{\sqrt{d_k}} + M\right)VW_h^V,
+	\end{aligned}
+\end{equation}
+with
+\begin{equation}
+	W_h^Q\in \R^{2d\times d_k}, \quad W_h^K\in \R^{2\times d_k}, \quad W_h^V\in \R^{1\times d_v}, \quad W^\tau\in\R^{Hd_v \times d_{\tau}},
+\end{equation}
+are the parameters to learn. $M\in\mathbb{R}^{N_\text{mesh}}$ is the mask matrix (not learnable) to make sure the attention only happens on those mesh points that are close to the characteristic line.
+
+\paragraph{Multi-head attention on characteristic line}
+The main idea of using multi-head attention is to approximate the integral of optical depth $\tau_-(\br,\bOmega)$ numerically. For any phase point $(\br,\bOmega)$, a simple numerical integration along the characteristic line yields,
+\begin{equation}
+	\tau_{-,t}(\br,\bOmega) \approx  \sum_{j}^{N\left(s_{-}(\br,\bOmega)\right)} w(\br, \bOmega;s_j)\mut(\br-s_j \bOmega),
+\end{equation}
+where $N(s_{-}(\br,\bOmega))$ is the number of quadrature points, and $w(\br, \bOmega; s_j)$ is the weight of the $j$-th quadrature point.
+Notice here the integral is always in $s$ which means it is a one-dimensional integral along the characteristic line.
+
+Ideally, one can do the ray tracing for every phase point $(\br,\Omega)$ and discretize the integration using the quadrature points along the characteristic line.
+However, for each $(\br,\bOmega)$, different quadrature points $s_i$ are used, thus different weights $w(\br,\Omega; s_j)$ and $N\left(s_{-}(\br,\bOmega)\right)$ are employed. It is computationally expensive to determine the position of all quadrature points. On the other hand, in practice, usually we only have the values of $\mu_t$ on the spatial mesh $\{\br_i^{\text{mesh}}\}$, i.e., $\{{(\mu_t^\text{mesh})}_i\}$, so in order to get the value of $\mu_t(\br - s_i\bOmega)$, one needs to do the interpolation/projection. After interpolation/projection, the value of $\mu_t(\br - s_i\bOmega)$ can be expressed by a linear combination of $\{{(\mu_t^\text{mesh})}_i\}$ such that
+\begin{equation}\label{eq:crcha}
+	\mut(\br-s_j \bOmega)\approx  \sum_{i}^{N_\text{mesh}} \bm{1}_{\mathcal{C}_{\br,\bOmega}}(\rmesh_i) c(\br-s_j\bOmega, \br^{\text{mesh}}_i){(\mu_t^\text{mesh})}_i,
+\end{equation}
+where $c(\br-s_j\bOmega, \br^{\text{mesh}}_i)$ is the contribution of the $i$-th mesh point $\br_i^{\text{mesh}}$. The value of $c(\br-s_j\bOmega, \br^{\text{mesh}}_i)$ is determined by the relative position between $\br^{\text{mesh}}_i$ and the $j$-th quadrature point on the characteristic line.
+As in Fig.~\ref{fig:mask}, the set $\mathcal{C}_{\br,\bOmega}$ is composed by the mesh points $\rmesh$ that are not far away from the characteristic line, which is determined by the some threshold $\delta$ such that
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=.8\textwidth]{mask.pdf}
+	\caption{Mask and relative position embedding. Solid dots represent active grid nodes within the $\delta$-neighborhood of the characteristic line. These nodes provide spatial support for optical depth interpolation, thereby avoiding full-domain computation.}\label{fig:mask}
+\end{figure}
+\begin{equation}
+	\mathcal{C}_{\br,\bOmega} = \left \{\rmesh_i \mid \text{distance}\left(\rmesh_i, \{\br - s\bOmega, s\in(0,s_-(\br,\bOmega))\}\right) < \delta\right \}.
+\end{equation}
+This indicates that only those mesh points near the characteristic line contribute.
+
+More precisely, the relative position of $\br^{\text{mesh}}_i$ and the $j$th quadrature point $\br-s_j \bOmega$ can be determined by the projection of $\br^{\text{mesh}}_i$ on the characteristic line and the angle between the vector ${(\mu_t^\text{mesh})}_i-\br$ and the characteristic line (see Fig.~\ref{fig:mask}).
+Noticing that $\|\bOmega \| = 1$ and the characteristic line is at the opposite direction of $\bOmega$, we have
+\begin{equation}
+	\begin{cases}
+		{(r^\text{mesh}_\text{local})}_i      & = -(\br^\text{mesh}_i - \br)\cdot \bOmega,                          \\
+		{(\theta^\text{mesh}_\text{local})}_i & = {(r^\text{mesh}_\text{local})}_i / \| \br^\text{mesh}_i - \br \|,
+	\end{cases}
+\end{equation}
+see Alg.~\ref{alg:relative-position-encoding}, then
+\begin{equation}
+	c(\br-s_j\bOmega, \br^{\text{mesh}}_i) = c\left(s_j; {(r^\text{mesh}_\text{local})}_i, {(\theta^\text{mesh}_\text{local})}_i\right).
+\end{equation}
+\begin{algorithm}[H]
+	\caption{Relative Position Encoding}\label{alg:relative-position-encoding}
+	\vspace{0.5em}
+	$\Def \text{ RelativePositionEncoding}(\br, \bOmega, \tilde{\br})$:
+	\begin{algorithmic}[1]
+		\vspace{0.5em}
+		\Comment{Relative position}
+		\vspace{0.5em}
+		\State$\br_{\text{rel}} = \br - \tilde{\br}$
+		\vspace{0.5em}
+		\Comment{Local coordinates}
+		\vspace{0.5em}
+		\State$r_{\text{local}} =  \br_{\text{rel}} \cdot \bOmega$
+		\vspace{0.5em}
+		\State$\theta_{\text{local}} = r_{\text{local}}/\|\br_{\text{local}}\|$
+		\vspace{0.5em}
+		\Comment{Mask along characteristic}
+		\vspace{0.5em}
+		\State$m = -10^{10} \text{ if } s_\text{local} < 0 \text{ else } 0$
+		\vspace{0.5em}
+		\Ret$(r_\text{local},\theta_\text{local}), m$
+	\end{algorithmic}
+\end{algorithm}
+Using above observation, one can approximate the optical depth as
+\begin{equation}
+	\begin{aligned}
+		\tau_{-,t}(\br,\bOmega) & \approx \sum_j^{N\left(s_{-}(\br,\bOmega)\right)} w(\br, \bOmega;s_j)\sum_{i}^{N_\text{mesh}} \bm{1}_\mathcal{C}(\rmesh_i)c\left(s_j; {(r^\text{mesh}_\text{local})}_i, {(\theta^\text{mesh}_\text{local})}_i\right){(\mu_t^\text{mesh})}_i         \\
+		                        & =\sum_{i}^{N_\text{mesh}} \bm{1}_\mathcal{C}(\rmesh_i)\left(\sum_{j}^{N\left(s_{-}(\br,\bOmega)\right)} w(\br, \bOmega;s_j)c\left(s_j; {(r^\text{mesh}_\text{local})}_i, {(\theta^\text{mesh}_\text{local})}_i\right)\right){(\mu_t^\text{mesh})}_i \\
+		                        & =\sum_{i}^{N_\text{mesh}} \underbrace{\bm{1}_\mathcal{C}(\rmesh_i)W(\br,\bOmega; {(r^\text{mesh}_\text{local})}_i, {(\theta^\text{mesh}_\text{local})}_i)}_{\text{attention weights}}\underbrace{{(\mu_t^\text{mesh})}_i}_{\text{values}},
+		% & \approx \sum_{i}^{N_\text{mesh}} \left(\sum_{m}^{d_k} w_m(\br,\bOmega)w_m\left((r_\text{local})_i, (\theta_\text{local})_i\right)\right)\mut(\br_i^{\text{mesh}}).
+	\end{aligned}
+\end{equation}
+Here, we first evaluate the inner summation on $j$ to determine the coefficient $W\left(\br,\bOmega; {(r_\text{local})}_i, {(\theta_\text{local})}_i\right)$, which indicates that the attention weights count for the contribution of each grid point to the integration in the optical depth.
+
+At the continuous level, the weight do not depend on the choices of $N\left(s_{-}(\br,\bOmega)\right)$ and $s_j$. Similar property holds at the discrete level. This is important since the quadrature points are not given explicitly in the NN representation. The coefficient $W$ works as the correlation between the phase point $(\br,\bOmega)$ and the mesh point $\br_i^{\text{mesh}}$ with its local coordinate representation.
+In another point of view, the coefficient $W$ can be learned by the multi-head attention mechanism, where the query is the phase point $(\br,\bOmega)$, the key is the local coordinate representation of the mesh point $\br_i^{\text{mesh}}$, and the value is the total absorption coefficient $\mu_t(\br_i^{\text{mesh}})$, given the following approximation:
+\begin{equation}
+	W\left(\br,\bOmega; {\left(r^\text{mesh}_\text{local}\right)}_i, {\left(\theta^\text{mesh}_\text{local}\right)}_i\right) \approx \sum_{m}^{d_k} \underbrace{q_m(\br,\bOmega)}_{\text{query}:\;QW^Q_h}\underbrace{k_m({(r^\text{mesh}_\text{local})}_i, {(\theta^\text{mesh}_\text{local})}_i)}_{\text{keys}:\;KW^K_h},
+	% & \approx \text{softmax}\left((QW_h^Q) (KW_h^K)^T / \sqrt{d_k} + M\right),
+\end{equation}
+where $d_k$ is some hyperparameter to determine the dimension of the key space, and $w_m$ is the $m$-th head of the multi-head attention mechanism.
+Then the indicator function $\bm{1}_\mathcal{C}(\rmesh_i)$ is implemented by the mask $M$ together with the commonly used softmax function:
+\begin{equation}
+	\text{softmax}_i(\bm{x}) = \frac{e^{x_i+m_i}}{\sum_j e^{x_j+m_j}},
+\end{equation}
+where $m_i$ is $-10^{10}$ if the mesh point $\rmesh_i$ is not in the set $\mathcal{C}$ and $0$ otherwise, this makes the attention weights get zero when the mesh point is far away from the characteristic line.
+
+Combining all the ingredients above together we obtain the following Alg.~\ref{alg:optical-depth-net}:
+\begin{algorithm}[H]
+	\caption{Optical Depth Network}\label{alg:optical-depth-net}
+	\vspace{0.5em}
+	$\Def \text{ OpticalDepthNet}(\br, \bOmega, \{\br_i^{\text{mesh}}\}, \{{(\mut^{\text{mesh}})}_i\}, \{{(\mus^{\text{mesh}})}_i\}, d_k=12, H=2)$:
+	\begin{algorithmic}[1]
+		\vspace{0.5em}
+		\Comment{Relative position}
+		\vspace{0.5em}
+		\State${(\br^\text{mesh}_{\text{local}})}_i, m_i = \hyperref[alg:relative-position-encoding]{\text{RelativePositionEncoding}}(\br$, $\bOmega,
+			\br_i^{\text{mesh}})$
+		\vspace{0.5em}
+		\Comment{Input projections to heads}
+		\vspace{0.5em}
+		\State$\bm{q}^h = \text{LinearNoBias}((\br,\bOmega))$ \hfill $\bm{q}^h\in \mathbb{R}^{d_k},\; h\in \{1,\dots,H\}$
+		\vspace{0.5em}
+		\State$\bm{k}_i^h = \text{LinearNoBias}\left({(\br^\text{mesh}_{\text{local}})}_i\right)$ \hfill $\bm{k}_i^j\in \mathbb{R}^{d_k}$
+		\vspace{0.5em}
+		\State$\bm{v}_i^h = \text{LinearNoBias}\left(\text{concat}\left({(\mut^{\text{mesh}})}_i,{(\mus^{\text{mesh}})}_i\right)\right)$ \hfill $\bm{v}_i^j\in \mathbb{R}^{d_v}$
+		\vspace{0.5em}
+		\Comment{Attention}
+		\vspace{0.5em}
+		\State$a_{i}^h = \text{softmax}_i\left(\frac{1}{\sqrt{d_k}}{(\bm{q}^h)}^{\transpose}\bm{k}_i^h+m_i\right)$
+		\vspace{0.5em}
+		\State$\bm{\tau}^h = \sum_i a_{i}^h \bm{v}_i^h$ \hfill $\bm{\tau}^h\in\R^{d_v}$
+		\vspace{0.5em}
+		\Comment{Output projection}
+		\vspace{0.5em}
+		\State$\tau_{-} = \text{LinearNoBias}\left(\text{concat}_h(\bm{\tau}^h)\right)$ \hfill $\tau_{-}\in \mathbb{R}^{d_\tau}$
+		\vspace{0.5em}
+		\Ret$\tau_{-}$
+	\end{algorithmic}
+\end{algorithm}
+
+\begin{remark}
+	In the implementation, we use the whole mesh points $\{\br_i^{\text{mesh}}\}$ to compute the optical depth $\tau_-(\br,\bOmega)$, which is a more general and flexible approach. However, in practice, one can also use a subset of the mesh points to compute the optical depth $\tau_-(\br,\bOmega)$, which can be more efficient and faster.
+\end{remark}
+
+\subsection{Scattering module}\label{sec:scattering-module}
+Based on the expansion of operator $G$ in~\eqref{eq:greens-function-series}, we propose the following structure for the Scattering module, as shown in Fig.~\ref{fig:scattering-module},
+\begin{equation}
+	\begin{aligned}
+		 & \bG^{0} = \bG^{\text{NN}}(\br,\bOmega,\br^{\prime},\bOmega^{\prime}),                               \\
+		 & \bG^{\ell}  = \text{ScatteringBlock}_{\ell}(\bG^{\ell-1}) + \bG^{0}, \quad \ell = 1,\dots,N_{\ell},
+	\end{aligned}
+\end{equation}
+where the $\text{ScatteringBlock}_\ell$, as shown in Fig.~\ref{fig:scattering-block}, is defined as
+\begin{equation}\label{eq:scattering-block}
+	\text{ScatteringBlock}_\ell(\bm{G}) = \text{LayerNorm}\Big(\sigma\Big(\bm{W}^{\ell} \bm{S}^{\top} \bm{G} + \bm{b}^{\ell}\Big)\Big).
+\end{equation}
+
+According to Eq.~\eqref{eq:fixed-point-iteration},
+the scattering block can be viewed as an approximation the operator $\cL\cS$. $\bm{W}^{\ell} \in \mathbb{R}^{d_{\text{model}}\times d_{\text{model}}}$ and $\bm{b}^{\ell} \in \mathbb{R}^{d_{\text{model}}}$ are learnable weights and bias. Multiplying $G$ by $
+	\bm{S} = \big[\, w_i\, p(\bOmega, \bOmega_i^*) \,\big]_{j=1}^{d_{\text{quad}}}
+$ gives a discrete approximation of the scattering operator in~\eqref{eq:scattering-op}. $\sigma(x)$ denotes the activation function which is $\tanh(x)$ in our implementation.
+
+The normalization layer follows~\cite{ba2016layernormalization,xu2019understanding} with trainable affine parameters $\bm{\gamma},\bm{\beta} \in \mathbb{R}^{d_{\text{model}}}$
+\begin{equation}
+	\text{LayerNorm}(\bm{x}) = \frac{\bm{x}-\alpha\bm{1}}{\sigma}\cdot\bm{\gamma} + \bm{\beta}, \quad\alpha=\sum_{i=1}^{d_{\text{model}}}\frac{x_i}{d_\text{model}}, \quad\sigma=\sqrt{\sum_{i=1}^{d_{\text{model}}}\frac{{(x_i-\alpha)}^2}{d_\text{model}}}.
+\end{equation}
+Layer normalization improves the stability of the recursive computation in~\eqref{eq:greens-function-iterations}. If the weight matrix $\bm{W}^\ell$ is ill-conditioned or nearly singular, repeated multiplications can accumulate errors and reduce convergence quality. Using layer normalization helps prevent these issues and makes the training process more robust and efficient. There are two common approaches to applying LayerNorm:
+\begin{itemize}
+	\item \textbf{Post-Norm}: Normalization is applied after the scattering operator. This straightforward method performs well in shallow networks.
+	\item \textbf{Pre-Norm}: Normalization is applied before the scattering operator. This approach can alleviate gradient issues in deeper networks.
+\end{itemize}
+After evaluating both implementations, we adopt Post-Layer Normalization in the ScatteringBlock for its enhanced stability and simplicity.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.9\textwidth]{scattering_module.pdf}
+	\caption{Scattering module. Stacked residual blocks with physics-informed $\cS$-approximation layers, employing tanh-activated operator transforms and adaptive layer normalization for stabilized learning.}\label{fig:scattering-module}
+\end{figure}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=1\textwidth]{scattering_block.pdf}
+	\caption{Scattering block.
+		Representing simulating the result of the operator $\cS$ acting once.Including weighted summation of integral, linear projection and activation.}\label{fig:scattering-block}
+\end{figure}
+
+\noindent The detailed algorithm for Scattering module is provided in Alg.~\ref{alg:scattering-module}.
+\begin{algorithm}[H]
+	\caption{Scattering Module}\label{alg:scattering-module}
+	\vspace{0.5em}
+	$\Def \text{ ScatteringModule}(\bm{g}, \{\bm{g}^*_j\}, \{p(\bOmega,\bOmega^*_i)\},\{p(\bOmega^*_i,\bOmega^*_j)\}, \{w_j\}, N_s=2)$:
+	\begin{algorithmic}[1]
+		\vspace{0.5em}
+		\Comment{Keep the initial value to be added at the each block}
+		\vspace{0.5em}
+		\State${(\bm{g}^*_j)}^{\text{init}} = \bm{g}^*_j$ \hfill ${(\bm{g}^*_j)}^{\text{init}}\in \mathbb{R}^{d_{\text{model}}}$
+		\vspace{0.5em}
+		\Comment{Scattering block with skip connections}
+		\vspace{0.5em}
+		\ForAll{$\ell\in[0,\ldots,N_\ell-2]$}
+		\vspace{0.5em}
+		\Statex{\hspace{1.5em}\color{Brown}\small\textit{\# \;Initial value is added at each block to simulate expansion}}
+		\vspace{0.5em}
+		\State$\bm{g}^*_i\gets{(\bm{g}^*_i)}^{\text{init}} + \hyperref[alg:scattering-block]{\text{ScatteringBlock}_\ell}(\{\bm{g}^*_j\},\{p(\bOmega^*_i,\bOmega^*_j), \{w_j\} \}) $ \hfill $\bm{g}^*_i\in \mathbb{R}^{d_{\text{model}}}$
+		\vspace{0.5em}
+		\EndFor%
+		\vspace{0.5em}
+		\State$\bm{g}\mathrel{+}=\hyperref[alg:scattering-block]{\text{ScatteringBlock}_{N_\ell-1}}(\{\bm{g}^*_i\},\{p(\bOmega,\bOmega^*_i)\}, \{\omega_i\})$ \hfill $\bm{g}\in \mathbb{R}^{d_{\text{model}}}$
+		\vspace{0.5em}
+		\Ret$\bm{g}$
+	\end{algorithmic}
+\end{algorithm}
+
+\subsubsection{Scattering block}
+Building on the series expansion in Eq.~\eqref{eq:soln-op-series}, we define a truncated state vector representation that captures the radiation field at discrete points along characteristic lines:
+
+\begin{equation}
+	\bG^{\ell} =
+	\begin{pmatrix}
+		G^\ell(\br-s_1 \bOmega, \bOmega; \br', \bOmega') \\
+		\vdots                                           \\
+		G^\ell(\br-s_{d_{\text{model}}} \bOmega, \bOmega; \br', \bOmega')
+	\end{pmatrix}\in \mathbb{R}^{d_{\text{model}}},
+\end{equation}
+where $\bG^0$ is initialized by the Attenuation Module. This formulation yields an efficient recursive relation:
+\begin{equation}
+	G^{\ell+1} = \cL\cS G^\ell + G^0.
+\end{equation}
+$\cL\cS$ is composed of two physical processes: (1) angular scattering $\cS$; (2) lifting $\cL$ along the characteristic line. One can represent $\cL\cS$ into the following integral form:
+\begin{equation}\label{LS}
+	\cL\cS G^{\ell}(\br, \bOmega) = \int_0^{s_{-}(\br, \bOmega)} e^{-\tau(0,s')}
+	\mus(\br-s' \bOmega) \underbrace{\frac{1}{S_d} \int_{\sS^{d-1}}
+		p(\bOmega, \bOmega^*) G^{\ell}(\br-s' \bOmega, \bOmega^*)
+		\diff{\bOmega^*}}_{\cS G^{\ell}(\br-s' \bOmega, \bOmega)} \diff{s'}.
+\end{equation}
+
+\paragraph{Numerical Implementation}
+For computational tractability, we employ numerical quadrature:
+
+\begin{equation}
+	\cS G^\ell(\br-s' \bOmega, \bOmega) \approx \sum_{i=1}^{d_{\text{quad}}} w_i p(\bOmega, \bOmega_i^*) G^{\ell}(\br-s' \bOmega, \bOmega_i^*),
+\end{equation}
+where $d_{\text{quad}}$ quadrature points with weights $\{w_i\}$ approximate the angular integral.
+
+In order to approximate the integration on the right-hand side of \eqref{LS},  we use the discrete scattering approximation:
+\begin{equation}
+	\cL\cS G^{\ell}(\br, \bOmega) \approx \sum_{j=1}^{d_{\text{model}}} \tilde{w}_j^{\br, \bOmega} \mus e^{-\tau(0,s'_j)} \cS G^\ell(\br-s'_j \bOmega, \bOmega).
+\end{equation}
+
+%\paragraph{Learnable Matrix Representation}
+To avoid recomputing characteristic line integrals, we parameterize the transport operator as a learnable weight matrix:
+% \begin{equation}
+%   \begin{aligned}
+%     \cL\cS G^{\ell}(\br-s'_i\bOmega, \bOmega) & \approx
+%     \sum_{j=1}^{d_{\text{model}}} \tilde{w}_j^{\br-s'_i \bOmega, \bOmega} \mus e^{-\tau(s'_i,s'_j)} \cS{G}^{\ell}(\br-(s'_j+s'_i) \bOmega, \bOmega)\\
+%      & = \sum_{j=1}^{d_{\text{model}}} \underbrace{\tilde{w}_j^{\br-s'_i \bOmega, \bOmega} \mus e^{-\tau(0,s'_j)}}_{w^\cL_{ij}} \cS{G}^{\ell}(\br-s'_j \bOmega, \bOmega)\\
+%     & = \bm{w}^\cL_{i} {\cS \bG}^{\ell},
+%   \end{aligned}
+% \end{equation}
+\begin{equation}\label{eq:scattering-mus}
+	\begin{aligned}
+		\cL\cS G^{\ell}(\br-s'_i\bOmega, \bOmega) & \approx  \sum_{j=1}^{d_{\text{model}}} \underbrace{\tilde{w}_j^{\br-s'_i \bOmega, \bOmega} \mus e^{-\tau(0,s'_j)}}_{w^\cL_{ij}} \cS{G}^{\ell}(\br-s'_j \bOmega, \bOmega) \\
+		                                          & = \bm{w}^\cL_{i} {\cS \bG}^{\ell},
+	\end{aligned}
+\end{equation}
+% \begin{equation}
+%   \begin{aligned}
+%     \cL\cS G^{\ell}(\br-s'_i\bOmega, \bOmega) & \approx \sum_{j=1}^{d_{\text{model}}} \tilde{w}_j^{\br-s'_i \bOmega, \bOmega} \mus e^{-\tau(0,s'_j)} \cS{G}^{\ell}(\br-s'_j \bOmega, \bOmega)\\
+%     & = \bm{w}^\cL_{i} {\cS \bG}^{\ell},
+%   \end{aligned}
+% \end{equation}
+where $\bm{w}^\cL_{i} = (w^\cL_{i1}, w^\cL_{i2}, \cdots, w^\cL_{id_{\text{model}}}) \in \mathbb{R}^{d_{\text{model}}}$.
+The complete system is represented through:
+
+\begin{equation}
+	\bG^{\ell} =
+	\begin{pmatrix}
+		G^{\ell}(\br-s_1 \bOmega, \bOmega) \\
+		\vdots                             \\
+		G^{\ell}(\br-s_{d_{\text{model}}} \bOmega, \bOmega)
+	\end{pmatrix}, \quad
+	\mathbf{W}^\ell =
+	\begin{pmatrix}
+		\bm{w}^\cL_1 \\
+		\vdots       \\
+		\bm{w}^\cL_{d_{\text{model}}}
+	\end{pmatrix}.
+\end{equation}
+
+\paragraph{Neural Network Implementation}
+In practice, we treat $\bm{W}^\ell$ as learnable parameters, allowing the network to automatically discover optimal coupling between spatial points during training. The scattering block simplifies to:
+
+\begin{equation}\label{scattering_layer}
+	\text{ScatteringBlock}_\ell(\bm{G}) = \text{LayerNorm}\Big(\sigma\Big(\bm{W}^{\ell} \bm{S}^{\top} \bm{G} + \bm{b}^{\ell}\Big)\Big),
+\end{equation}
+where $\bm{W}^{\ell} \in \mathbb{R}^{d_{\text{model}}\times d_{\text{model}}}$ encodes both the transport physics and numerical quadrature weights in a data-driven manner.
+
+The detailed description of the Scattering block is provided in Alg.~\ref{alg:scattering-block}.
+\begin{algorithm}
+	\caption{Scattering Block}\label{alg:scattering-block}
+	\vspace{0.5em}
+	$\Def \text{ ScatteringBlock}(\{\bm{g}_i\}, \{p_i\}, \{\omega_i\}, d_{\text{model}}=16)$:
+	\begin{algorithmic}[1]
+		\vspace{0.5em}
+		\Comment{Numerical integration as a weighted summation}
+		\vspace{0.5em}
+		\State$\bm{g}  = \sum_i \omega_i p_i \bm{g}_i$
+		\vspace{0.5em}
+		\Comment{Linear layer and activation}
+		\vspace{0.5em}
+		\State$\bm{g}\gets \text{tanh}\left(\text{Linear}( \bm{g})\right)$  \hfill $\bm{g}\in \mathbb{R}^{d_{\text{model}}}$
+		\vspace{0.5em}
+		\Comment{Layer normalization}
+		\vspace{0.5em}
+		\State$\bm{g} \gets \text{LayerNorm}(\bm{g})$
+		\vspace{0.5em}
+		\Ret$\bm{g}$
+	\end{algorithmic}
+\end{algorithm}
+
+\begin{remark}\label{rmk:optical-depth-encoding}
+	To encode $\mus e^{-\tau(0,s'_j)}$ into the scattering module, we construct the weights $\bm{W}^\ell$ in Eq.~\eqref{eq:scattering-block} as:
+	\begin{equation}
+		\mathbf{W}^\ell =
+		\begin{pmatrix}
+			\bm{w}^\cL_1 \\
+			\vdots       \\
+			\bm{w}^\cL_{d_{\text{model}}}
+		\end{pmatrix}
+		=
+		\begin{pmatrix}
+			\tilde{w}_j^{\br-s'_1 \bOmega, \bOmega}\circ \tau^{NN}_{-,s} \\
+			\vdots                                                       \\
+			\tilde{w}_j^{\br-s'_{d_\mathrm{model}} \bOmega, \bOmega} \circ \tau^{NN}_{-,s}
+		\end{pmatrix},
+	\end{equation}
+	where $\tau^{NN}_{-,s} \approx ( \mus(\br-s'_1\bOmega) e^{-\tau(0,s'_1)}, \mus(\br-s'_2\bOmega) e^{-\tau(0,s'_2)}, \cdots, \mus(\br-s'_{d_{\mathrm{model}}}\bOmega) e^{-\tau(0,s'_{d_{\mathrm{model}}})} )$. We observe that $\tau(0,s'_j)$ can be modeled using an attention-based architecture similar to our Attenuation module. The full computational sequence - evaluating $\tau(0,s'_j)$, applying the exponential, and multiplying by $\mus$ - is approximated end-to-end by a neural network.
+
+	In practice, this network is implemented within the Attenuation module alongside $\tau^{NN}_{-,t}$, with the actual output of $\mathrm{OpticalDepthNet}$ being the concatenation $\tau_- = \mathrm{Concat}(\tau^{NN}_{-,t}, \tau^{NN}_{-,s})$. This design is formalized in Alg.~\ref{alg:optical-depth-net}, which defines $\tau_-$ as:
+	\begin{equation}
+		\tau_- = \mathrm{Concat}\left(\tau^{NN}_{-,t}, \tau^{NN}_{-,s}\right) = \mathrm{OpticalDepthNet}\left(\br,\bOmega; \{\br^{\mathrm{mesh}}_i\}, \left\{(\mu_t^{\mathrm{mesh}}, \mu_s^{\mathrm{mesh}})_i\right\}\right) \in \mathbb{R}^{d_{\tau}},
+	\end{equation}
+	where $d_\tau > d_{\mathrm{model}}$.
+
+	% Alternatively, these physical components could be explicitly modeled by using an attention-based architecture, similar to our Attenuation module, to determine the values of $\mus$ and $e^{-\tau(0,s')}$ along the direction $\br-s_j \bOmega$. While this explicit decomposition can improve interpretability, we empirically found that: (1) it significantly increased the total number of model parameters, and (2) despite the added complexity, it offered no measurable improvement in performance. Our experiments showed that directly learning $\bm{W}^\ell$ achieves comparable accuracy with greater computational efficiency.
+\end{remark}

@@ -1,0 +1,11 @@
+{
+    "name": "latex-devcontainer",
+    "image": "registry.gitlab.com/islandoftex/images/texlive:latest",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "James-Yu.latex-workshop"
+            ]
+        }
+    }
+}

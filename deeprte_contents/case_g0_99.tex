@@ -1,0 +1,56 @@
+\paragraph{Out-of-distribution possibility for the scattering kernel}
+One last experiment we conducted is to test the performance of DeepRTE when the scattering kernel is outside the distribution of our pretraining dataset.
+We test the performance as $g$ approaches $1$ and present the results for $g = 0.99$ under the following experimental setup:
+\begin{equation}
+	\mu_t(x,y) =
+	\begin{cases}
+		6, & \text{if } (x,y) \in D_\mu    \\
+		10 & \text{if } (x,y) \notin D_\mu
+	\end{cases},
+	\quad
+	\mu_s(x,y) =
+	\begin{cases}
+		3, & \text{if } (x,y) \in D_\mu    \\
+		5  & \text{if } (x,y) \notin D_\mu
+	\end{cases},
+	\quad \text{where } D_\mu = [0.4, 0.6]^2,
+\end{equation}
+and the incoming boundary conditions are:
+\begin{equation}
+	\left \{
+	\begin{aligned}
+		 & I_-(x=0,y,c>0,s) =(5\sin{2\pi y}+5)(\sin{\pi c}+1)(\sin{\pi s}+1),  \\
+		 & I_-(x=1,y,c<0,s) = (5\sin{2\pi y}+5)(\sin{\pi c}+1)(\sin{\pi s}+1),
+		\\
+		 & I_-(x,y=0,c,s>0) =(5\sin{2\pi x}+5)(\sin{\pi c}+1)(\sin{\pi s}+1),
+		\\
+		 & I_-(x,y=1,c,s<0) =(5\sin{2\pi x}+5)(\sin{\pi c}+1)(\sin{\pi s}+1).
+	\end{aligned}
+	\right.
+\end{equation}
+
+\begin{figure}[htbp]
+	\centering
+	\begin{subfigure}[t]{0.32\textwidth}
+		\centering
+		\includegraphics[width=\linewidth]{figs/test_g0.99_phi_label.pdf}
+		\caption{$\Phi_{\text{label}}$}
+		\label{fig:deeprte-g099-label}
+	\end{subfigure}\hfill
+	\begin{subfigure}[t]{0.32\textwidth}
+		\centering
+		\includegraphics[width=\linewidth]{figs/test_g0.99_phi_pre.pdf}
+		\caption{$\Phi_{\text{predict}}$}
+		\label{fig:deeprte-g099-predict}
+	\end{subfigure}\hfill
+	\begin{subfigure}[t]{0.32\textwidth}
+		\centering
+		\includegraphics[width=\linewidth]{figs/test_g0.99_phi_error.pdf}
+		\caption{Absolute error}
+		\label{fig:deeprte-g099-error}
+	\end{subfigure}
+	\caption{DeepRTE evaluation ($g=0.99$).}
+	\label{fig:deeprte-g099}
+\end{figure}
+
+The figure above illustrates the reference solution $\Phi_{\text{label}}$, the predicted solution $\Phi_{\text{predict}}$, and the absolute error between them. Despite the challenging scenario with $g$ extremely close to 1, DeepRTE demonstrates remarkable accuracy. The quantitative metrics, including MSE of $0.00764$ and RMSPE of $4.257\%$, confirm DeepRTE's effectiveness and robustness in handling near-unity anisotropy. This performance highlights DeepRTE's capability to accurately solve the radiative transfer equation even under highly-peaked regime.

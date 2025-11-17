@@ -1,0 +1,76 @@
+% Notation table (grouped theoretical vs numerical/model). Requires booktabs.
+\section{Table of Notation}
+\begin{longtable}[c]{c c p{0.78\textwidth}}
+  \toprule
+  Notation                 & Section & Definition                                                                                                               \\
+  \midrule
+  \endhead
+
+  \midrule
+  \endfoot
+
+  \bottomrule
+  \endlastfoot
+
+  % \multicolumn{3}{l}{\textbf{Theoretical symbols}}                                                                                                              \\
+  \(d\)                    &    $\S 1$     & Spatial dimension                                                                                                        \\
+  \(D\)                    &    $\S1$     & Spatial domain $D\subset \mathbb{R}^d$                                                                                   \\
+  \(\partial D\)           &    $\S1$    & Boundary of $D$                                                                                                          \\
+  \(\sS^{d-1}\)            &    $\S1$     & Unit sphere in $\mathbb{R}^d$                                                                                            \\
+  \(S_{d-1}\)              &    $\S1$     & Surface area of $\sS^{d-1}$, $S_{d-1}=2\pi^{d/2}/\Gamma(d/2)$                                                            \\
+  \(\br\)                  &    $\S1$     & Position vector                                                                                                          \\
+  \(\bOmega\)              &    $\S1$     & Direction unit vector                                                                                                    \\
+  \(\bm{v}\)               &    $\S2$   & Velocity vector $\bm{v}=\lvert \bm{v} \rvert \, \bOmega$                                                                 \\
+  \(I\)                    &     $\S1$    & Radiative intensity                                                                                                      \\
+  \(I_{-}\)                &    $\S2$     & Inflow boundary intensity on $\Gamma_{-}$                                                                                \\
+  \(\mut\)                 &    $\S1$     & Total cross section                                                                                                      \\
+  \(\mus\)                 &     $\S1$    & Scattering cross section                                                                                                 \\
+  \(\mu_a\)                &     $\S2$    & Absorption cross section $\mu_a=\mut-\mus$                                                                               \\
+  \(p\)                    &    $\S1$     & Phase function                                                                                                           \\
+  \(\bn(\br)\)             &     $\S2$    & Unit outward normal at $\br\in\partial D$                                                                                \\
+  \(\Gamma_{\pm}\)         &    $\S2$     & In/out-flow boundary sets: $\Gamma_{\pm}=\{(\br,\bOmega)\in \partial D\times \sS^{d-1}\mid \mp \bn(\br)\cdot\bOmega<0\}$ \\
+  \(s\)                    &   $\S2.1$   & Path length parameter along characteristic line                                                                          \\
+  \(s_{-}(\br,\bOmega)\)   &     $\S2.1$    & Distance from $\br$ to boundary along $-\bOmega$                                                                         \\
+  \(g\)                    &      $\S5.1$   & Asymmetry parameter of Henyey--Greenstein phase function                                                                 \\
+  \(\Phi\)                 &      $\S4.4$   & Scalar density (angular average of $I$)                                                                                  \\
+  \(\tau_{\br,\bOmega}(s_1, s_2)\)   &     $\S2.1$    & Optical depth: $\tau_{\br,\bOmega}(s_1,s_2):=\int_{s_1}^{s_2} \mut(\br-s \bOmega) \diff{s}$                                                                                                \\
+  \(G\)                    &     $\S2.2$    & Green's function of the RTE                                                                                              \\
+  \(\A\)                   &      $\S2$   & Solution operator: $\A[I_-]=I$                                                                                           \\
+  \(\J\)                   &    $\S2.1$     & Boundary (attenuation) operator                                                                                          \\
+  \(\cL\)                  &     $\S2.1$    & Lifting operator (characteristic integration with $\mu_s$)                                                               \\
+  \(\cS\)                  &   $\S2.1$      & Scattering operator                                                                                                      \\
+  \(\rho_p\)       &     $\S2.1$    & Spectral radius in weighted $L^p$ space                                                                                  \\
+    \(\sigma\)               &     $\S2.2$    & Characteristic length                                                                        \\
+    \(\zeta_\sigma\)    &     $\S4.2$    & Mollification kernel                                                                             \\
+  \(\delta_{\{\br'\}}\)    &     $\S2.2$    & Dirac distribution on $\partial D$ at $\br'$                                                                             \\
+  \(\delta\)               &    $\S2.2$     & Dirac delta on direction space                                                                                           \\
+  \addlinespace
+  \multicolumn{3}{l}{\textbf{Network}}                                                                                                        \\
+    \(\br^{\text{mesh}}_i\)     &    $\S3$     & Spatial mesh point                                                                              \\
+        \((\mut^{\text{mesh}})_i\)     &    $\S3$     & Spatial dependent total cross section: $(\mut^{\text{mesh}})_i = \mut(\br^{\text{mesh}}_i)$                                                                              \\
+            \((\mus^{\text{mesh}})_i\)     &    $\S3$     & Spatial dependent scattering cross section: $(\mus^{\text{mesh}})_i = \mus(\br^{\text{mesh}}_i)$        \\
+              \(D_\mu\)       &  $\S5.1$       & Subdomain of cross section                                                                             \\
+  \(d_{\text{model}}\)     &    $\S3.1$     & Latent / truncated representation dimension                                                                              \\
+  \(d_{\text{mlp}}\)       &      $\S3.1$   & Width (hidden size) of MLP layers                                                                                        \\
+    \(N_{\text{mesh}}\)       &  $\S3.1$       & Number of mesh points                                                                             \\
+      \(N_{\text{quad}}\)       &  $\S3.1$       & Number of angular quadrature points                                                                               \\
+  \(N_{\text{mlp}}\)       &  $\S3.1$       & Number of MLP layers in attenuation module                                                                               \\
+  \(N_{\ell}\)             &    $\S3.2$     & Number of scattering (residual) blocks                                                                                   \\
+  \(H\)                    &     $\S3.1$    & Number of attention heads                                                                                                \\
+  \(d_k, d_v\)             &    $\S3.1$     & Key / value embedding dimensions in attention                                                                            \\
+  \(d_{\tau}\)             &    $\S3.1$     & Dimension of optical-depth feature vector                                                                                \\
+  \(\bG^{\text{NN}}\)      &    $\S3$     & Discrete vector representation of Green's function                                               \\
+  \(\bm{W}^{\ell}\)        &    $\S3.2$     & Weight matrix in the $\ell$-th scattering block                                                                          \\
+  \(\tau^{\text{NN}}_{-}\) &      $\S3.1$   & Neural optical depth estimate  
+     \\
+  \(\tau_{-,t}\)           &     $\S3.1$    & Total optical depth to boundary
+  \\
+    \(\tau_{-,s}\)           &   $\S3.1$    & Scattering optical depth to boundary
+  \\
+  \(\bm{b}^{\ell}\)        &    $\S3.2$     & Bias vector in the $\ell$-th scattering block                                                                                                                                           \\
+  \(w_i\)                  &    $\S3$     & Quadrature weights                                                             \\
+  \(\ell\)                 &   $\S4.3$      & Mean squared error                                                                                            \\
+  \(\mathcal{L}\)          &     $\S4.3$    & Empirical training loss                                                                                                  \\
+  \(B\)                    &     $\S5.2$    & Batch size                                                                                                               \\
+  \(\eta\)                 &    $\S5.2$     & Learning rate                                                                                                            \\
+\end{longtable}

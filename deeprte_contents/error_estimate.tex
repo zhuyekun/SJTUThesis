@@ -1,0 +1,148 @@
+Inspired by the particle methods~\cite{raviart1983analysis, chertock2017practical}, we construct the the approximation of boundary condition $I_-$ by a linear combination of Dirac distributions (delta functions).
+\begin{equation}
+  I_{-}(\br, \bOmega) \approx I_{-}^{N_\text{bc}}(\br,\bOmega):=\sum_{i,j}^{N_\text{bc}} w_{ij}\delta_{\{\br_i\}}(\br)\delta(\bOmega-\bOmega_j), \quad (\br,\bOmega) \in \Gamma_{-},
+\end{equation}
+where $w_{ij}$ are given coefficients. This can be
+done, for instance, in the sense of measures. Namely, for any test function $\phi\in C^0_0(\Gamma_-)$, the inner product $(I_{-},\phi)$ should be approximated by
+\begin{equation}
+  \int_{\Gamma_{-}} I_{-}(\br,\bOmega)\phi (\br,\bOmega) \diff{\br} \diff{\bOmega} \approx (I_{-}^{N_\text{bc}},\phi) = \sum_{i,j}^{N_\text{bc}} w_{ij}\phi(\br_i,\bOmega_j).
+\end{equation}
+Based on this we observe that determining the weights $w_{ij}$ can be achieved through solving a standard numerical quadrature problem. However, the above result is not convinient when one is interested in obtaining point values of the computed solution. In this respect, it is more useful to associate the particle function $I_{-}^{N_\text{bc}}$ with a continuous function $I_{-,\sigma}^{N_\text{bc}}$ which approximates the boundary $I_{-}$ in a more classical sense.
+
+The regularization of particle solution is usually performed by taking a convolution product with a mollification kernel (or, so-called, cut-oﬀ function), $\zeta_\sigma$, that after a proper scaling takes into account the tightness of the particle discretization, namely,
+\begin{equation}
+  I_{-}(\br, \bOmega) \approx I_{-,\sigma}(\br,\bOmega)
+  := (I_-*\zeta_\sigma)(\br, \bOmega)
+  = \int_{\Gamma_-} I_-(\br', \bOmega') \zeta_\sigma(\br-\br', \bOmega - \bOmega') \diff{\br'}\diff{\bOmega'},
+\end{equation}
+where $\zeta_\sigma \in C^0(\Gamma_-)\cap L^1(\Gamma_-)$ is a mollification kernel satisfying (see~\cite{raviart1983analysis}):
+% \begin{itemize}\setlength\itemsep{0em}
+%   \item $\zeta_\sigma \in C^\infty$ (smoothness)
+%   \item it is compactly supported
+%   \item $\int \zeta_\sigma(\br,\bOmega) \diff{\br} \diff{\bOmega} = 1$ (normalization)
+%   \item \highlight[id=ZYK]{$\zeta_\sigma(\br, \bOmega) = \frac{1}{\sigma^{2d-1}}\zeta_{\sigma}(\frac{\br, \bOmega}{\sigma})$}
+% \end{itemize}
+\begin{equation}
+  \zeta_\sigma(\br, \bOmega):=\frac{1}{\sigma^{2d-1}}\zeta_{\sigma}\left(\frac{\br}{\sigma}, \frac{\bOmega}{\sigma}\right), \quad \quad  \int_{\Gamma_{-}} \zeta_\sigma(\br,\bOmega) \diff{\br} \diff{\bOmega} = 1.
+\end{equation}
+and $\sigma$ denotes a characteristic length of the kernel, which in our case
+\begin{equation}
+  \zeta_\sigma(\br-\br', \bOmega-\bOmega') := \zeta^{\sigma_{\br}}_{\{\br'\}}(\br)\zeta^{\sigma_{\bOmega}}(\bOmega-\bOmega'), \quad \text{with } \sigma:=\max{(\sigma_{\br},\sigma_{\bOmega})},
+\end{equation}
+The particle approximation of $I_-$ is then defined as
+\begin{equation}\label{eq:particle-approx}
+  I_-(\br, \bOmega) \approx
+  I^{N_{\text{bc}}}_{-,\sigma}(\br,\bOmega)
+  := (I_-^{N_\text{bc}}*\zeta_\sigma)(\br, \bOmega)
+  = \sum_{i,j}^{N_\text{bc}} w_{ij}\zeta_\sigma(\br-\br_i,\bOmega-\bOmega_j),
+\end{equation}
+where $N_{\text{bc}}$ denotes the number of quadrature points in boundary $\Gamma_-$.
+
+The accuracy of the particle method will thus be related to the moments of $\zeta_\sigma$ that are being conserved, and we say that the kernel is of order $k$ when:
+\begin{equation}\label{eq:order_k}
+  \left \{ % tex-fmt: skip
+  \begin{aligned}
+    &\int_{\Gamma_{-}} \zeta_\sigma(\br, \bOmega) \diff{\br} \diff{\bOmega} = 1, \\
+    &\int_{\Gamma_{-}} \br^{\alpha_i}\bOmega^{\alpha_j} \zeta_\sigma(\br, \bOmega) \diff{\br} \diff{\bOmega} = 0, \quad \text{for all }\alpha = \alpha_i + \alpha_j\text{ such that } 1\leq |\alpha|\leq k-1, \\
+    &\int_{\Gamma_{-}} \left|(\br,\bOmega)^T\right|^k |\zeta_\sigma(\br, \bOmega)| \diff{\br} \diff{\bOmega} < \infty.
+  \end{aligned}
+  \right. % tex-fmt: skip
+\end{equation}
+According to~\cite{chertock2017practical}, we have the following error estimate for the boundary condition approximation.
+
+\begin{thm}\label{thm:bc-error-estimate}
+  Let~\eqref{eq:order_k} are satisfied for some integer $k\geq 1$, Assume that $\zeta \in W^{m,p}(\Gamma_-)\cap W^{m,1}(\Gamma_-)$ for some integer $m>d$. Then, for $I_- \in W^{l,p}(\Gamma_-)$ with $l=\max{(k, m)}$. There exists a positive constant $C$, s.t.
+  \begin{equation}\label{eq:bc_error_estimate}
+    \|I_- - I^{N_{\text{bc}}}_{-,\sigma}\|_{L^p(\Gamma_-)}\leq C\left\{ \sigma^k \|I_-\|_{k,p,\Gamma_-} + \left(\frac{h}{\sigma}\right)^m \|I_-\|_{m,p,\Gamma_-}\right\},
+  \end{equation}
+  where $h > 0$ is the size of non-overlapping cubes covering $\Gamma_-$.
+\end{thm}
+
+The two terms in the above estimate may be balanced by choosing an appropriate size of $\sigma$.
+Intuitively, it is clear that if the smoothing parameter $\sigma$ is too small in comparison to the minimal distance between particles, the approximate function will vanish away from the $\sigma$-neighborhood of the particles and is thus irrelevant.
+On the other hand, large values of $\sigma$ will generate unacceptable smoothing errors.
+Theoretically $\sigma$ is chosen so that the smoothing error and the
+discretization error are of the same order and it is common to take $\sigma\sim O(\sqrt{h})$.
+More discussions on the choice of $\sigma$ can be found in~\cite{raviart1983analysis, chertock2017practical}.
+
+\textbf{Delta function training dataset.} So our strategy is to train the DeepRTE operator $\ANN$ with the following boundary conditions:
+\begin{equation}
+  \left\{\zeta_\sigma \mid \zeta_\sigma(\br-\br_i, \bOmega-\bOmega_j)
+  = \zeta^{\sigma_{\br}}_{\{\br_i\}}(\br)\zeta^{\sigma_{\bOmega}}(\bOmega-\bOmega_j), \;(\br_i, \bOmega_j) \in \Gamma_-, \, i,j \in \{0,\ldots,N_{\text{bc}}-1\},\; (\sigma_{\br},\sigma_{\bOmega})\sim \Sigma\right\},
+\end{equation}
+where $\Sigma$ is some distribution. We call this the delta function training dataset.
+
+According to the universal approximation capability of neural networks~\cite{hornik1989multilayer, weinanpriori, weinan2019barron}, we assume the generalization error of well-trained $\ANN_\theta$ on the delta function training dataset is small, i.e., assume there exits a parameter set $\theta^*$ of neural network such that
+\begin{equation}
+  \|\ANN_{\theta^*}\zeta_\sigma - \A\zeta_\sigma\|\leq \varepsilon, \quad \forall \zeta_\sigma \in \text{delta function testing dataset},
+\end{equation}
+we can then estimate the generalization error of $\ANN$ on any boundary condition $I_-$ by the following theorem:
+\begin{thm}\label{thm:error-estimate}
+  For $\mut$, $\mus$ and $p$ given and satisfying the asumptions in Theorem~\ref{thm:existence-uniqueness-l2},
+  let $\A$ and $\ANN$ be the linear operators defined in~\eqref{eq:rte-op} and~\eqref{eq:greens-integral-nn}, respectively.
+  For any $I_- \in L^2(\Gamma_-)$, let $I^{N_{\text{bc}}}_{-,\sigma}$ be the approximation of $I_-$ defined in~\eqref{eq:particle-approx}. If there exists a parameter set $\theta^*$ of neural network such that
+  \begin{equation}
+    \|\ANN_{\theta^*}\zeta_\sigma - \A\zeta_\sigma\|\leq \varepsilon, \quad \forall \zeta_\sigma \in \text{delta function testing dataset},
+  \end{equation}
+  then we have:
+  \begin{equation}
+    \begin{aligned}
+      \|\A^{\text{NN}}_{\theta^*} I_- - \A I_-\|_{L^2(D\times\sS^{d-1})}\leq C\left\{ \sigma^k \|I_-\|_{H^k(\Gamma_-)} + \left(\frac{h}{\sigma}\right)^m \|I_-\|_{H^m(\Gamma_-)} + \varepsilon\right\}.
+    \end{aligned}
+  \end{equation}
+\end{thm}
+
+\begin{proof}
+  We use $L^2$ instead of $L^2(D\times\sS^{d-1})$ to simplify the notation in the following proof.
+  The solution operator $\A$ is linear since RTE is a linear equation w.r.t. boundary condition and let us first state the linearity of $\ANN_{\theta^*}$ which can be easily verified using the definition in~\eqref{eq:greens-integral-nn}:
+  \begin{equation}
+    \begin{aligned}
+      \ANN_{\theta^*}(\alpha I_{-}^{(1)} + \beta I_{-}^{(2)})
+      &=\int_{\Gamma_-} G^{\text{NN}}_{\theta^*} (\alpha I_{-}^{(1)} + \beta I_{-}^{(2)}) \diff{\br'} \diff{\bOmega'}, \\
+      &=\alpha\int_{\Gamma_-} G^{\text{NN}}_{\theta^*} I_{-}^{(1)} \diff{\br'} \diff{\bOmega'} + \beta \int_{\Gamma_-} G^{\text{NN}}_{\theta^*} I_{-}^{(2)} \diff{\br'} \diff{\bOmega'}, \\
+      & =\alpha \ANN_{\theta^*} I_{-}^{(1)} + \beta \ANN_{\theta^*} I_{-}^{(2)}, \quad \quad \forall I_{-}^{(1)}, I_{-}^{(2)}, \in L^2(\Gamma_-), \; \alpha, \beta \in \mathbb{R}.
+    \end{aligned}
+  \end{equation}
+  Thus, we have
+  \begin{equation}\label{eq:error_estimate}
+    \|\ANN_{\theta^*} I_- - \mathcal{A} I_-\|_{L^2}
+    \leq \|\ANN_{\theta^*} (I_- - I^{N_{\text{bc}}}_{-,\sigma})\|_{L^2} + \|\mathcal{A} (I_- - I^{N_{\text{bc}}}_{-,\sigma})\|_{L^2} + \|(\ANN_{\theta^*} - \mathcal{A}) I^{N_{\text{bc}}}_{-,\sigma}\|_{L^2} .
+  \end{equation}
+
+  For the first term, since $\A^{\text{NN}}_{\theta^*}$ defined by
+  \begin{equation}
+    \ANN_{\theta^*} I_{-} = \int_{\Gamma_-} G^{\text{NN}}_{\theta^*}(\br, \bOmega; \br', \bOmega') I_{-}(\br', \bOmega') \diff{\br'} \diff{\bOmega'},
+  \end{equation}
+  and our neural network $G^{\text{NN}}_{\theta^*}$ is continuous (as all the operations in the architecture are continuous function) on the compact domains $\Gamma_-$ and $D \times \mathbb{S}^{d-1}$, so
+  \begin{equation}
+    \int_{D \times \mathbb{S}^{d-1}\times \Gamma_-} |G^{\text{NN}}_{\theta^*}|^2 \diff{\br'} \diff{\bOmega'} \diff{\br} \diff{\bOmega} < \infty,
+  \end{equation}
+  which means $\ANN_{\theta^*}$ is a Hilbert-Schmidt operator.
+  By the properties of Hilbert-Schmidt operators, $\A^{\text{NN}}_{\theta^*}$ is automatically bounded as a linear operator.
+  Thus, we have
+  \begin{equation}\label{eq:error_estimate_1}
+    \|\ANN_{\theta^*} (I_- - I^{N_{\text{bc}}}_{-,\sigma})\|_{L^2} \leq C_1 \|I_- - I^{N_{\text{bc}}}_{-,\sigma}\|_{L^2(\Gamma_-)}.
+  \end{equation}
+  For the second term, we can also obtain, according to Theorem~\ref{thm:existence-uniqueness-l2},
+  \begin{equation}\label{eq:error_estimate_3}
+    \|\mathcal{A} (I_- - I^{N_{\text{bc}}}_{-,\sigma})\|_{L^2} \leq C_2 \|I_- - I^{N_{\text{bc}}}_{-,\sigma}\|_{L^2(\Gamma_-)}.
+  \end{equation}
+  Finally, for the last term, by the definition of $I^{N_{\text{bc}}}_{-,\sigma}$ in~\eqref{eq:particle-approx} and linearity of $\A$, $\ANN_{\theta^*}$, we have
+  \begin{equation}\label{eq:error_estimate_2}
+    \begin{aligned}
+      \|(\ANN_{\theta^*} - \mathcal{A}) I^{N_{\text{bc}}}_{-,\sigma}\|_{L^2}
+      &= \left\|(\ANN_{\theta^*} - \mathcal{A}) \sum_{i,j}^{N_{\text{bc}}} w_{ij}\zeta_\sigma\right\|_{L^2} \\
+      &\leq \sum_{i,j}^{N_{\text{bc}}} |w_{ij}| \|(\ANN_{\theta^*} - \mathcal{A}) \zeta_\sigma\|_{L^2} \\
+      &\leq \varepsilon \sum_{i,j}^{N_{\text{bc}}} |w_{ij}|:= C_3 \varepsilon.
+    \end{aligned}
+  \end{equation}
+  Combining~\eqref{eq:error_estimate},~\eqref{eq:error_estimate_1},~\eqref{eq:error_estimate_2} and~\eqref{eq:error_estimate_3}, we obtain
+  \begin{equation}
+    \begin{aligned}
+      \|\A^{\text{NN}}_{\theta^*} I_- - \A I_-\|_{L^2}
+      &\leq (C_1 + C_2) \|I_- - I^{N_{\text{bc}}}_{-,\sigma}\|_{L^2(\Gamma_-)} + \varepsilon \sum_{i,j}^{N_{\text{bc}}} |w_{ij}|, \\
+      &\leq C\left\{ \sigma^k \|I_-\|_{H^k(\Gamma_-)} + \left(\frac{h}{\sigma}\right)^m \|I_-\|_{H^m(\Gamma_-)} + \varepsilon\right\},
+    \end{aligned}
+  \end{equation}
+  where the last inequality is due to Theorem~\ref{thm:bc-error-estimate}. This completes the proof.
+\end{proof}

@@ -1,0 +1,229 @@
+\section{Analytical structure of the solution operator}\label{sec:preliminaries}
+%We aim to explore fundamental properties of the solution operator for stationary RTE for scattering atmosphere ($q\equiv 0$) with inflow boundary condition.
+%These properties will serve as the foundation for constructing our neural network model in the subsequent sections.
+Let
+\begin{equation}\label{eq:boundary}
+	\Gamma_{\pm} := \{(\br,\bOmega) \mid \br\in\partial
+	D,\;\bOmega\in\sS^{d-1},\;\mp\bn(\br)\cdot\bOmega<0 \},
+\end{equation}
+where $\bn(\br)$ is the outer normal direction of $D$ at
+$\br\in\partial D$. $I(\br,\bOmega)$ satisfies the
+following RTE with inflow boundary conditions:
+\begin{equation}\label{eq:rte-with-bc}
+	\begin{aligned}\bOmega \cdot \nabla I(\br,\bOmega) + \mut(\br) I(\br,\bOmega) & = \frac{\mus(\br)}{S_{d-1}} \int_{\sS^{d-1}} p(\bOmega,\bOmega^*) I(\br,\bOmega^*)\diff{\bOmega^*}, &  & \text{in } D\times\sS^{d-1}, \\
+               I|_{\Gamma_{-}}(\br,\bOmega)                                   & = I_{-}(\br,\bOmega),                                                                               &  & \text{on }\Gamma_{-},
+	\end{aligned}
+\end{equation}
+where $I_{-}$ is a given function on $\Gamma_{-}$ and $S_{d-1} = \dfrac{2\pi^{d/2}}{\Gamma(d/2)}$ is the surface area of the unit sphere $\sS^{d-1}$.
+
+The coefficient functions in this boundary value problem are the total cross section $\mu_t$, the scattering cross section $\mu_s$, and the scattering kernel $p$. We also define the absorption cross section $\mu_a = \mu_t - \mu_s$. The kernel $p(\bOmega,\bOmega^*)$ represents the probability density of scattering from direction $\bOmega^*$ into direction $\bOmega$. We assume reciprocity (indistinguishable particles), i.e., $p(\bOmega,\bOmega^*) = p(\bOmega^*,\bOmega)$, and the normalization
+\begin{equation}
+	\frac{1}{S_{d-1}}\int_{\sS^{d-1}} p(\bOmega,\bOmega^*) \,\mathrm{d}\bOmega^* = 1
+	\quad\text{for a.e. }\bOmega\in\sS^{d-1}.
+\end{equation}
+In many applications, one additionally assumes rotational invariance of the scattering kernel:
+$p(\bOmega,\bOmega^*) = \tilde p(\bOmega\cdot\bOmega^*)$, so $p$ depends only on the scattering angle
+$\theta = \arccos(\bOmega\cdot\bOmega^*)$. We adopt this assumption to simplify our description; however, our algorithm applies equally to general kernels.
+
+In a more general settings where $\mut$ and $\mus$ not only depend on $\br$ but also depend on the velocity speed and angular: $\bm{v} = |\bm{v}|\bOmega$, solvability in $L^1$ and $L^\infty$ has been established in~\cite{case1963existence} under the sub-criticality conditions
+\begin{equation}
+	\mu = \frac{\mus}{\mut} < 1 - \nu, \quad \nu > 0,
+\end{equation}
+These imply that the scattering operator is a small perturbation of the differential operator on the left-hand side of~\eqref{eq:rte-with-bc} and contraction arguments apply.
+Corresponding results in $L^p$ for $1 \leq p \leq \infty$ can be found in~\cite{agoshkov2012boundary,choulli1999inverse}.
+Note that \textit{a priori} estimates for the solution derived under these conditions typically degenerate when $\nu\to 0$.
+In~\cite{vladimirov1963mathematical}, solvability in $L^1$ was established provided that
+\begin{equation}
+	\mua = \mut - \mus \geq 0, \quad \text{and } \mut > 0.
+\end{equation}
+Existence results in $L^2$ were developed under these conditions in~\cite{choulli1999inverse,manteuffel1999boundary,egger2012mixed} by variational arguments.
+Note that the assumption $\mut > 0$ excludes the presence of void regions and that the \textit{a priori} estimates again degenerate when $\mut \to 0$.
+Based on monotonicity arguments, existence of solutions in $L^1$ was established in~\cite{pettersson2001stationary,falk2003existence}, without the strict positivity assumption on $\mut$.
+For velocities with uniform speed $|\bm{v}|$ (as in our case $|\bm{v}|=1$), solvability in $L^2$ was established without lower bounds on $\mut$ in~\cite{egger2014stationary}.
+While the previous results are based on some sort of contraction principle, it is possible to obtain existence of solutions also via compactness arguments and Riesz-Schauder or analytic Fredholm theory~\cite{stefanov2008inverse}.
+These results, however, do not lead to computable a-priori bounds.
+
+In this paper, we use the existence and uniqueness results in~\cite{egger2014lp} and~\cite{egger2014stationary}. The former work established the existence and uniqueness of solutions in $L^p$ for $1\leq p\leq\infty$ under a more general setting where $\mut$ and $\mus$ depend on both $\br$ and $\bm{v}$ which states that:
+\begin{thm}\label{thm:existence-uniqueness-lp}
+	See~\cite{egger2014lp} Assume the following conditions hold:
+	\begin{enumerate}
+		\item Let $\bm{v}=|\bm{v}|\bOmega\in V\subset\mathbb{R}^3$ be open and $D\subset\mathbb{R}^d$ is a bounded Lipschitz domain;
+		\item $\mut:D\times V \to \mathbb{R}$ is non-negative and $\tau\mut\in L^\infty(D\times V)$. Here $\tau(\br,\bm{v})$ denotes the length of the line segment through $\br$ in direction $\bm{v}$ completely contained in $D$;
+		\item $p: V\times V\to\mathbb{R}$ is non-negative and measurable and
+		      \begin{equation}
+			      \mua=\mut - \mus \geq 0.
+		      \end{equation}
+	\end{enumerate}
+	Then, for all $1\leq p \leq\infty$ and all admissible data $I_{-}$ the radiative transfer problem~\eqref{eq:rte-with-bc} admits a unique solution $I$ that satisfies
+	\begin{equation}
+		\|\tau^{-\frac{1}{p}}I\|_{L^p(D\times V)} \leq e^{C_p}\|I_{-}\|_{L^p(\Gamma_{-};|\bn\cdot\bOmega|)}, \quad \text{with }
+		C_p =\|\tau\mus\|_{L^\infty}.
+	\end{equation}
+	Morever, if we further assume $\mut>0$ and for some $\nu>0$,
+	\begin{equation}
+		\frac{\mus}{\mut} \leq 1 - \nu,
+	\end{equation}
+	then
+	\begin{equation}
+		\|\mut^{\frac{1}{p}}I\|_{L^p(D\times V)} \leq \nu^{-\frac{1}{p}}\|I_{-}\|_{L^p(\Gamma_{-};|\bn\cdot\bOmega|)},
+	\end{equation}
+	this allows to consider also the case $\mut\to\infty$ which may be important for asymptotic considerations.
+\end{thm}
+For our specific settings and numerical purpose, most often we will use the later theorem in which we assume $\mut$ and $\mus$ depend only on $\br$. The existence and uniqueness of solutions to~\eqref{eq:rte-with-bc} in $L^2(D\times\sS^{d-1})$ established in~\cite{egger2014stationary} states:
+\begin{thm}\label{thm:existence-uniqueness-l2}
+	Assume domain $D$ is bounded, let $\mua=\mut-\mus$, $\mus$, $p$ be non-negative and bounded measurable functions, i.e.,
+	\begin{equation}
+		\mua=\mut -\mus \geq 0, \quad \mus \geq 0, \quad \text{and} \quad \|\mua\|_{L^\infty(D)}<\infty, \|\mus\|_{L^\infty(D)}<\infty.
+	\end{equation}
+	and assume that
+	\begin{equation}
+		\frac{1}{S_{d-1}}\int_{\sS^{d-1}}p(\bOmega,\bOmega^*)\diff{\bOmega^*}=1, \quad\text{for a.e. } \bOmega\in \sS^{d-1}.
+	\end{equation}
+	Then for any $I_{-}\in L^2(\partial D\times\sS^{d-1})$ the RTE with boundary condition~\eqref{eq:rte-with-bc} has a unique solution $I\in L^2(D\times\sS^{d-1})$. Moreover, the \textit{a priori} estimate
+	\begin{equation}
+		\|\bOmega\cdot\nabla I\|_{L^2(D\times\sS^{d-1})}+\|I\|_{L^2(D\times\sS^{d-1})} \leq C \|I_{-}\|_{L^2(\partial D\times\sS^{d-1})},
+	\end{equation}
+	holds with a constant $C$ that only depends on $\text{diam}(D)$, $\|\mua\|_{L^\infty(D)}$ and $\|\mus\|_{L^\infty(D)}$.
+\end{thm}
+
+According to above existence and uniqueness results, if $\mut$, $\mus$ and $p$ satisfy the assumptions in~\ref{thm:existence-uniqueness-l2}, we can define the solution operator of \eqref{eq:rte-with-bc} as
+%If the problem~\eqref{eq:rte-with-bc} is solvable, one can define the following solution operator
+\begin{equation}
+	\A: (I_{-};\mu_t,\mu_s,p) \mapsto I,
+\end{equation}
+that maps the inflow intensity $I_{-}$ on the boundary, the total
+cross section coefficient $\mut$, the scattering coefficient $\mus$
+and the scattering kernel $p$ to the solution $I$ inside the whole computational domain.
+It is important to note that $\A$ is linear in $I_{-}$ but nonlinear in other function inputs.
+
+Our \emph{Goal} is to develop an efficient and accurate method for numerically approximating the solution operator $\mathcal{A}$. A comprehensive understanding of the structure of the solution operator—even from a formal perspective—is crucial for constructing efficient and well-generalized deep neural networks to approximate $\mathcal{A}$. We will decompose $\mathcal{A}$ into solution operators that are computationally tractable, so that valuable insights for the efficient utilization of neural networks can be gained. This, in turn, enables us to design an architecture specifically tailored for solving RTE. We first review the analytical form of the solution operator, which can be expressed as a sequence expansion.
+
+\subsection{Structure of solution operator}
+%According to the standard approaches in ~
+In order to express the solution operator in a more tractable form, we follow the standard approach in~\cite{case1963existence,choulli1999inverse} to convert RTE to a fixed-point equation.
+Let us start by reformulating the radiative transfer problem as an equivalent integral equation
+in the usual way. All the calculations below are formal and can be found in~\cite{egger2014lp,fan2019solving}.
+
+We define $\tau_{\br,\bOmega}(s_1,s_2)$ be the \emph{optical depth} or \emph{optical thickness} from $\br-s_1\bOmega$ to $\br-s_2\bOmega$ along the characteristic line, i.e.,
+\begin{equation} \label{eq:optical-depth}
+	\tau_{\br,\bOmega}(s_1,s_2):=\int_{s_1}^{s_2} \mut(\br-s \bOmega) \diff{s},
+\end{equation}
+and $s_{-}(\br,\bOmega)$ be the distance of a particle moving in direction $\bOmega$ traveling from $\br$ to the domain boundary, i.e.,
+\begin{equation}
+	s_{-}(\br,\bOmega):= \inf \{s \geq 0 \mid \br-s\bOmega \in\partial D\}.
+\end{equation}
+One can then get the solution of the boundary value problem
+\begin{equation}\label{eq:rte-sweep}
+	\begin{aligned}\bOmega \cdot \nabla J_b(\br,\bOmega) + \mut(\br) J_b(\br,\bOmega) & = 0,                  &  & \text{in } D\times\sS^{d-1}, \\
+               J_b|_{\Gamma_{-}}(\br, \bOmega)                                    & = I_{-}(\br,\bOmega), &  & \text{on }\Gamma_{-},
+	\end{aligned}
+\end{equation}
+by
+\begin{equation}\label{eq:attenuation-op}
+	J_b(\br, \bOmega)= \J I_{-}(\br, \bOmega) = e^{-\tau_{\br,\bOmega}(0,s_{-}(\br,\bOmega))} I_{-}\left(\br-s_{-}(\br, \bOmega)
+	\bOmega, \bOmega\right).
+\end{equation}
+
+Similarly, when $I$ is known, the solution of
+\begin{equation}\label{eq:lifting}
+	(\bOmega\cdot\nabla + \mut)J = \mus I, \quad  J|_{\Gamma_{-}} = 0,
+\end{equation}
+can be given by
+\begin{equation}\label{eq:lifting-op}
+	J=\cL I(\br, \bOmega) = \int_0^{s_{-}(\br, \bOmega)} e^{-\tau_{\br,\bOmega}(0,s)}\mus(\br-s\bOmega)I(\br-s\bOmega, \bOmega)\diff{s},
+\end{equation}
+where one can refer $\cL$ being the lifting operator, and we also define the scattering operator (see Remark~\ref{remk:mus}):
+\begin{equation}\label{eq:scattering-op}
+	\cS I(\br, \bOmega) = \frac{1}{S_{d-1}}\int_{\sS^{d-1}} p(\bOmega, \bOmega^*)I(\br, \bOmega^*) \diff{\bOmega^*}.
+\end{equation}
+By inversing the operator $\bOmega \cdot \nabla + \mut(\br)$, the boundary value problem~\eqref{eq:rte-with-bc} can then be seen to be equivalent to the following operator equation in integral form~\cite{case1963existence}:
+%Denote by The RTE problem can then be seen to be equivalent to the following operator equation in integral form and
+\begin{equation}\label{eq:rte-op-form}
+	I = \cL\cS I + \J I_{-},
+\end{equation}
+which is a Fredholm integral equation of the second kind \cite{choulli1999inverse,egger2014lp,fan2019solving}.
+One can see that $\cL\cS I$ is the contribution from the scattering process and $\J I_{-}$ takes into account the boundary conditions.
+
+To establish the existence of a unique fixed point, one must demonstrate that $\cL\cS$ is a contraction mapping in an appropriate function space. This result is proven in~\cite{egger2014lp} under the assumptions stated in Theorem~\ref{thm:existence-uniqueness-lp}.
+
+The solution operator can also be expressed through the corresponding fixed-point iteration
+\begin{equation}\label{eq:fixed-point-iteration}
+	I^{m+1} = \cL\cS I^m + \J I_{-}.
+\end{equation}
+When the initial guess is set to $I^0=\J I_{-}$, this iteration takes the same form as the well-known classical source iteration method~\cite{adams2002fast}. Furthermore, as established in~\cite{egger2014lp}:
+\begin{thm}
+	Under the assumptions in Theorem~\ref{thm:existence-uniqueness-lp}, for all $1\leq p \leq\infty$, we have
+	\begin{equation}
+		\rho_p(\cL\cS):=\lim_{n\to\infty}\sqrt[n]{\|(\cL\cS)^n\|_{L^p(D\times V;\tau^{-1})}} \leq 1 - e^{-C_p} < 1.
+	\end{equation}
+\end{thm}
+This shows that the spectral radius of the fixed-point operator $\cL\cS$ is uniformly bounded away from one, ensuring convergence of the iteration to the solution of the RTE.
+Consequently, the solution operator admits the series representation
+\begin{equation}\label{eq:soln-op-series}
+	\A[\mu_t,\mu_s,p] I_{-} = \sum_{n=0}^\infty(\cL\cS)^n\J I_{-}.
+\end{equation}
+
+This iterative structure provides valuable insight for constructing neural network architectures, as the layered structure of neural networks naturally parallels the iterative nature of the solution operator.
+\begin{remark}\label{remk:mus}
+	In the literature, the scattering cross section $\mus$ is typically included in the scattering operator $\mathcal{S}$, not the lifting operator $\mathcal{L}$. However, we position $\mus$ within $\mathcal{L}$ to accommodate the specific architecture of our model. This choice arises because the lifting operator $\mathcal{L}$ is designed to inherently capture characteristic properties, whereas $\mathcal{S}$ is not. This distinction allows our framework to effectively integrate $\mus$ while maintaining consistency with the model's structural requirements, see Alg~\ref{alg:attenuation-module} and Alg~\ref{alg:scattering-module}.
+\end{remark}
+\subsection{Green's function}
+In this subsection, we study the distributional kernel of the solution operator $\A$. The following calculations are formal; for a rigorous treatment, we refer the reader to~\cite{choulli1999inverse}, Section~3.
+
+Let us denote $G(\br,\bOmega,\br',\bOmega')$ be the solution (in the distribution sense) to
+\begin{equation}\label{eq:rte-greens-function}
+	\begin{aligned}
+		(\bOmega \cdot \nabla + \mu_t)G & =  \mus\cS G, \quad                                     &  & \text{on } D\times\sS^{d-1}, \\
+		G|_{\Gamma_{-}}                 & = \delta_{\{\br'\}}(\br)\delta(\bOmega-\bOmega'), \quad &  & \text{on }\Gamma_{-},
+	\end{aligned}
+\end{equation}
+where $(\br',\bOmega')\in\Gamma_{-}$ are considered as parameters; $\delta_{\{\br'\}}$ denotes a distribution on $\partial D$ defined by
+\begin{equation}\label{eq:delta-func}
+	(\delta_{\{\br'\}},\phi) = \int_{\partial D}
+	\delta_{\{\br'\}}(\br)\phi(\br)\diff{\br} = \phi(\br'),\qquad
+	\forall \phi(\br)\in C_c^\infty(\partial D);
+\end{equation}
+$\delta(\bOmega)$ represents the standard Dirac delta function in $\sS^{d-1}$.
+$G$ is referred as the Green's function of the RTE, representing the system's response to a point source at the boundary. The solution $I$
+to~\eqref{eq:rte-with-bc} can be represented in the following integral form:
+\begin{equation} \label{eq:rte-op}
+	I(\br,\bOmega) = \int_{\Gamma_{-}}
+	G(\br,\bOmega,\br',\bOmega')I_{-}(\br',\bOmega')\diff{\br'}\diff{\bOmega'}
+	= \A[\mu_t,\mu_s,p] I_{-}(\br,\bOmega).
+\end{equation}
+
+The above formulation elucidates that if one can determine
+$G(\br,\bOmega,\br',\bOmega')$ for all $(\br',\bOmega')$ at the
+boundary, the solution can be readily obtained through the
+integral operator in~\eqref{eq:rte-op}. This insight informs
+the structure of our proposed deep neural network operator.
+%To this end, we consider the solution to~\eqref{eq:rte-with-bc} under a specific boundary condition:
+%\begin{equation}
+%  I_{-}(\br, \bOmega) = \delta_{\{\br'\}}(\br)\delta(\bOmega-\bOmega'),
+%\end{equation}
+
+According to~\eqref{eq:fixed-point-iteration} and~\eqref{eq:soln-op-series}, $G$ can be obtained by the following fixed-point iterations:
+\begin{equation}\label{eq:greens-function-iterations}
+	\begin{aligned}
+		 & G^{m+1} =\cL\cS G^m+G^0= \cL\cS G^m+\J\left(\delta_{\{\br'\}}(\br)\delta(\bOmega-\bOmega')\right).
+	\end{aligned}
+\end{equation}
+or expressed as a sequence expansion:
+\begin{equation}\label{eq:greens-function-series}
+	G(\br,\bOmega,\br',\bOmega') = \sum_{n=0}^\infty(\cL\cS)^n\J
+	\left(\delta_{\{\br'\}}(\br)\delta(\bOmega-\bOmega')\right),
+\end{equation}
+Then the structure of the solution operator can be expressed as
+\begin{equation} \label{eq:rte-op1}
+	\begin{aligned}
+		\A[\mu_t,\mu_s,p] I_{-}(\br,\bOmega) & = \int_{\Gamma_{-}}
+		G(\br,\bOmega,\br',\bOmega')I_{-}(\br',\bOmega')\diff{\br'}\diff{\bOmega'}               \\
+		                                     & = \sum_{n=0}^\infty\int_{\Gamma_{-}}(\cL\cS)^n \J
+		\left(\delta_{\{\br'\}}(\br)\delta(\bOmega-\bOmega')\right)I_{-}(\br',\bOmega')\diff{\br'}\diff{\bOmega'}.
+	\end{aligned}
+\end{equation}
+
+\begin{remark}If $ \mu_t $, $ \mu_s $, and $ p $ are given and fixed, a naive idea is using a MLP to construct the Green's function $ G(\mathbf{r}, \Omega, \mathbf{r}', \Omega') $. However, $ \mu_t $ and $ \mu_s $ are spatially dependent functions that can sometimes be discontinuous, while $ p(\Omega, \Omega^\ast) $ is defined on $ \mathbb{S}^{d-1} \times \mathbb{S}^{d-1} $. The dependence of the Green's functions on these parameter functions can be very complex.
+	Therefore, to train a solution operator that can be applied to all $ \mu_t $, $ \mu_s $, and $ p $ in the admissible set, one must consider the particular way in which the solution depends on the parameter functions within the structure of the Neural Operator.
+\end{remark}
+%Under the assumption of smooth boundaries and considering all quantities in the distributional sense, the series in~\eqref{eq:greens-function-series} converges and the iteration~\eqref{eq:greens-function-iterations} gives $G = \lim_{n\to\infty}G^n$.

@@ -1,0 +1,209 @@
+\section{Ablation study and comparison with baseline model}\label{sec:ablation-study}
+Our DeepRTE architecture is designed to mirror the mathematical structure of the RTE solution by decomposing it into an attenuation component that models transport along characteristics (operators $\J$ and $\cL$) and a scattering component that captures scattering behavior ($\cS$), as described in Section~\ref{sec:architecture}.
+Each component is implemented via distinct neural modules within DeepRTE: the Attenuation module (Section~\ref{sec:attenuation-module}) and the Scattering module (Section~\ref{sec:scattering-module}).
+To validate this design choice, we conduct carefully designed numerical experiments to assess whether each learned component corresponds directly to its analytical counterpart.
+As a control, we also compare DeepRTE against a baseline model that does not incorporate any RTE-specific inductive biases.
+
+We compare DeepRTE against the Multi-Input Operator (MIO)~\cite{jin2022mionet} (an operator learning framework derived from DeepONet to accept multiple input functions) as our baseline model, which employs a monolithic architecture without specialized design for the RTE. We choose MIO as the baseline for the following reasons:
+\begin{itemize}
+	\item MIO is one of the most commonly used operator learning frameworks that can handle multi-function inputs, making it suitable for learning the RTE solution operator that depends on multiple input functions ($I_-$, $\mut$, $\mus$, and $p$).
+	\item MIO (DeepONet) can theoretically approximate any continuous operator, including the RTE solution operator, given sufficient training data and network capacity~\cite{lu2021learning}.
+	\item MIO does not incorporate any physics-informed inductive biases specific to the RTE, allowing us to isolate the impact of DeepRTE's architecture that reflects the RTE's mathematical structure.
+\end{itemize}
+While FNO~\cite{li2020fourier} is another potential baseline, it is not suitable for this task due to several fundamental limitations:
+\begin{itemize}
+	\item FNO is designed for learning operators that map functions on regular grids to functions on the same grid, which does not align with the RTE's requirements for handling angular variables and complex boundary conditions.
+	\item FNO relies on Fourier transforms to capture global (non-local) information, but this approach faces significant challenges in the high-dimensional RTE solution space (spatial and angular dimensions), leading to prohibitive computational and memory costs. In our preliminary tests, these costs made FNO training infeasible within our computational budget.
+	\item The RTE operates on phase space involving both spatial and angular variables, whereas FNO typically applies to spatial domains only. Adapting FNO to handle angular dependencies would require non-trivial modifications (e.g., determining whether to apply Fourier transforms in the angular domain), which are not straightforward and may not be effective for this specific problem.
+\end{itemize}
+
+Due to these reasons, we focus our comparison on MIO as the baseline model. We first validate the effectiveness of the attenuation and scattering modules in DeepRTE through ablation studies. We then compare the overall performance of DeepRTE against MIO on the RTE solution operator learning task.
+
+\subsection{Ablation study of Attenuation module}
+
+The attenuation module models the transport behavior of the RTE without scattering effects.
+This behavior is characterized by two key processes: the attenuation of boundary conditions through the total cross section $\mut$ (operator $\J$, Eq.~\eqref{eq:attenuation-op}) and the attenuation of volumetric sources through the scattering cross section $\mus$ (lifting operator $\mathcal{L}$, Eq.~\eqref{eq:lifting-op}).
+
+The fundamental challenge lies in the fact that the solution operator $\A$'s dependence on $\mus$ and $\mut$ is both nonlinear and exhibits \emph{non-local behavior exclusively along characteristic lines}.
+Conventional architectures like MIO only capture general non-local dependencies through branch networks and inner products with trunk networks, which becomes computationally expensive as spatial and angular dimensions increase. More critically, this approach fails to accurately capture the RTE's characteristic-based attenuation behavior and may not generalize effectively.
+
+In contrast, DeepRTE incorporates a specialized attenuation module that explicitly models this non-local dependence along characteristic lines (which remain one-dimensional regardless of problem dimensionality) through carefully designed attention mechanisms, as detailed in Section~\ref{sec:attenuation-module}.
+To validate the effectiveness of this physics-informed design, we conduct two targeted experiments: one examining the attenuation operator $\J$ and another focusing on the lifting operator $\cL$.
+
+\textbf{1. Ablation study of operator $\J$.}
+We isolate the attenuation operator $\J$ by considering a pure attenuation scenario without scattering, governed by~\eqref{eq:rte-sweep}:
+\begin{equation}
+	\left\{ % tex-fmt: skip
+	\begin{aligned}
+		\bOmega \cdot \nabla J_b + \mut J_b & = 0,     \\
+		J_b|_{\Gamma_{-}}                   & = I_{-},
+	\end{aligned}
+	\right. % tex-fmt: skip
+\end{equation}
+which has the analytical formulation~\eqref{eq:attenuation-op}:
+\begin{equation}
+	\J: (I_{-}; \mut) \mapsto J_b = e^{-\tau_{\br,\bOmega}(0,s_{-}(\br,\bOmega))} I_{-}\left(\br-s_{-}(\br, \bOmega)
+	\bOmega, \bOmega\right).
+\end{equation}
+
+According to our architecture design in Section~\ref{sec:attenuation-module}, we use the Attenuation module to learn the mapping $\J^{\text{NN}}$ that approximates $\J$ as follows:
+\begin{equation}
+	J_b(\br,\bOmega) \approx \J^{\text{NN}}I_{-} := \int_{\Gamma_{-}} G^{\text{NN}}_{\J}(\br,\bOmega, \br',\bOmega'; \mut) I_-(\br',\bOmega')\diff{\br'}\diff{\bOmega'},
+\end{equation}
+where $G^{\text{NN}}_{\J}$ is analogous to the general attenuation Green's function~\eqref{G_equation}, but simplified to depend only on $\tau^{\text{NN}}_{-,t}$ as defined in~\eqref{eq:optical-depth-net}. Since the attenuation operator $\J$ depends exclusively on $\mut$ (and not on $\mus$), we formulate:
+\begin{equation}
+	G_{\J}^{\text{NN}}(\br,\bOmega, \br', \bOmega';\mut) = \text{MLP}(\br,\bOmega, \br', \bOmega', \tau^{\text{NN}}_{-,t}) \in \mathbb{R}^1.
+\end{equation}
+
+In our numerical experiments, we implement this by removing all scattering-related components: we set the number of scattering blocks $N_\ell = 0$ and reduce the dimension of $\mu$ from $2$ to $1$, effectively disabling attention mechanisms that depend on $\mu_s$.
+
+To validate that our architecture actually capture the attenuation effect, we compare it with the MIO that doesn't have any RTE specialized architecture. The MIO network we use here is quite standard as, see~\cite{jin2022mionet}:
+\begin{equation}
+	J_b(\br,\bOmega) \approx \text{MIO}_{\J}(\mut,I_{-}) := (\text{MLP}^{\text{branch}}_1(\mut)\odot\text{MLP}^{\text{branch}}_2(I_-))\cdot \text{MLP}^{\text{trunk}}(\br,\bOmega).
+\end{equation}
+
+For dataset construction, except for $\mus$ and $g$, all other settings remain unchanged (see Table~\ref{tab:dataset}). We use the same numerical solver as in~\ref{sec:dataset-construction} except that we disable scattering by setting $\mus = 0$ and set $g$ to be irrelevant (not used).
+Following these settings, we generate $1000$ samples for training and $100$ i.i.d. samples for testing.
+
+\textbf{2. Ablation study of operator $\cL$.} Similar to $\J$, we isolate the lifting operator $\cL$ by considering a pure lifting scenario without boundary inflow, governed by~\eqref{eq:lifting}:
+\begin{equation}
+	(\bOmega\cdot\nabla + \mut)J = \mus I, \quad  J|_{\Gamma_{-}} = 0,
+\end{equation}
+whose analytical formulation is given by~\eqref{eq:lifting-op}:
+\begin{equation}
+	\cL:(I;\mus,\mut) \mapsto J = \int_0^{s_{-}(\br, \bOmega)} e^{-\tau_{\br,\bOmega}(0,s)}\mus(\br-s\bOmega)I(\br-s\bOmega, \bOmega)\diff{s}.
+\end{equation}
+
+According to our architecture design in Section~\ref{sec:attenuation-module}, we use the Attenuation module to learn the mapping $\cL^{\text{NN}}$ that approximates $\cL$ as follows:
+\begin{equation}
+	J(\br,\bOmega) \approx \cL^{\text{NN}}I := \int_{D\times\sS^{d-1}}
+	G_{\cL}^{\text{NN}}(\br,\bOmega,\br',\bOmega';\mut,\mus)I(\br',\bOmega')\diff{\br'}\diff{\bOmega'},
+\end{equation}
+where $G^{\text{NN}}_{\cL}$ is the attenuation Green's function~\eqref{G_equation}. Since the lifting operator $\cL$ depends on both $\mut$ and $\mus$, according to~\eqref{G_equation} we formulate:
+\begin{equation}
+	G_{\cL}^{\text{NN}}(\br,\bOmega, \br', \bOmega';\mut,\mus) = \bG^{\text{NN}}(\br,\bOmega, \br', \bOmega', \tau^{\text{NN}}_{-})\bm{W}\in\mathbb{R}^1,
+\end{equation}
+where $\tau^{\text{NN}}_{-}$ is defined in~\ref{alg:optical-depth-net}, also see Remark~\ref{rmk:optical-depth-encoding}. The output dimension of $\bG^{\text{NN}}$ is $d_\text{model}$ and $\bm{W} \in \mathbb{R}^{d_{\text{model}}\times 1}$ is a learnable weight matrix that projects outputs into a single output channel, like the $\bm{W}$ in~\eqref{scattering_layer}.
+
+Similar to $\J$, we compare it with the $\text{MIO}_{\cL}$ that doesn't have any RTE specialized architecture:
+\begin{equation}
+	J(\br,\bOmega) \approx \text{MIO}_{\cL}(\mut,\mus;I) := (\text{MLP}^{\text{branch}}_1(\mut)\odot\text{MLP}^{\text{branch}}_2(\mus)\odot\text{MLP}^{\text{branch}}_3(I))\cdot \text{MLP}^{\text{trunk}}(\br,\bOmega).
+\end{equation}
+
+For dataset construction, except for $g$ (not needed) and boundary conditions $I_- = 0$ (set to 0), all other settings remain unchanged (see Table~\ref{tab:dataset}).
+For the source term $I(\br,\bOmega)$, we generate a two-dimensional Gaussian random field in the frequency domain using spectral synthesis~\cite{liu2019advances, ruan1998efficient}.
+We use the same numerical solver as in Sec.~\ref{sec:dataset-construction} except that we replace the scattering with $\mus I$.
+Following these settings, we generate $1000$ samples for training and $100$ i.i.d. samples for testing.
+
+\textbf{Results.} The results in Table~\ref{tab:j_l_compare} demonstrate that our Attenuation module $\J^{\text{NN}}$ and $\cL^{\text{NN}}$ substantially outperform $\text{MIO}_{\J}$ and $\text{MIO}_\cL$ across all metrics. Specifically, $\J^{\text{NN}}$ and $\cL^{\text{NN}}$ achieve over an order of magnitude improvement in both training and test MSE, while requiring $34$ times fewer parameters ($37,282$ vs. $4956160$ and $139,362$ vs. $4,792,320$). The test RMSPE is reduced from $44.251\%$, $25.350\%$ for MIO to $2.339\%$, $1.327\%$ for our approach. This stark performance difference validates that the design of our Attenuation module effectively captures the characteristic-based transport behavior inherent in operator $\J$ and $\cL$, whereas the generic MIO architecture fails to learn this specialized mapping efficiently.
+\begin{table}
+	\centering
+	\begin{tabular}{@{}cccccccc@{}}
+		\toprule
+		\multirow{2}{*}{Op}    & \multirow{2}{*}{Model} & \multirow{2}{*}{\# of Parameters} & \multicolumn{3}{c}{Training} & \multicolumn{2}{c}{Evaluation}                                                   \\
+		\cmidrule(l){4-6} \cmidrule(l){7-8}
+		                       &                        &                                   & MSE                          & RMSPE (\%)                     & \# Epochs & MSE                    & RMSPE (\%) \\
+		\midrule
+		\multirow{2}{*}{$\J$}  & Our $\J^{\text{NN}}$   & 37,282                            & $3.631\times 10^{-7}$        & 2.78                           & 200,000   & $4.561 \times 10^{-8}$ & 2.339      \\
+		                       & $\text{MIO}_{\J}$      & 4,956,160                         & $1.983\times 10^{-6}$        & 6.459                          & 200,000   & $1.088 \times 10^{-4}$ & 44.251     \\
+		\midrule
+		\multirow{2}{*}{$\cL$} & Our $\cL^{\text{NN}}$  & 139,362                           & $9.682 \times 10^{-6}$       & 0.909                          & 200,000   & $3.359 \times 10^{-5}$ & 1.327      \\
+		                       & $\text{MIO}_{\cL}$     & 4,792,320                         & $8.528 \times 10^{-4}$       & 8.565                          & 200,000   & $1.224 \times 10^{-2}$ & 25.350     \\
+		\bottomrule
+	\end{tabular}
+	\caption{Ablation study of attenuation module. Training and evaluation of $\J$ and $\cL$ operators comparied to MIO (without any RTE specialized architecture) .}\label{tab:j_l_compare}
+\end{table}
+
+\subsection{Ablation study of Scattering module}
+
+To examine the necessity of the scattering operator $\cS$ (Eq.~\ref{eq:scattering-op}), we employ a proof-by-contradiction approach. We hypothesize that $\cS$ is unnecessary and test this by substituting the scattering layer—the component that implements $\cS$—with a multi-layer perceptron of equivalent size.
+We denote this modified architecture as $\ANN_{\text{w/o }\cS}$.
+
+The only difference between $\ANN_{\text{w/o }\cS}$ and full DeepRTE $\ANN$ lies in the scattering block implementation. Instead of using Eq.~\ref{scattering_layer}, we disable the scattering operator $S^\top$:
+\begin{equation}
+	\text{ScatteringBlock}_\ell(\bm{G}) = \text{LayerNorm}\Big(\sigma\Big(\bm{W}^{\ell} \bm{G} + \bm{b}^{\ell}\Big)\Big),
+\end{equation}
+where this is no scatting operator $\cS$ involved, and $\bm{W}^{\ell}$ and $\bm{b}^{\ell}$ are learnable parameters of the MLP. The number of parameters in this MLP is kept approximately equal to that of the original scattering block to ensure a fair comparison.
+
+The dataset and training settings are the same as the original DeepRTE (see Section~\ref{sec:acc}). To evaluate the model's performance under different anisotropy conditions, the parameter $g$ in the training set is sampled uniformly from $0$ to $0.9$. Except this $g$, the training set for $\text{DeepRTE}_{\cS}$ uses the same configuration as the original DeepRTE model. For testing, we test on the same three scattering regimes~\ref{li:regimes}.
+
+If our hypothesis were correct, this modified model would successfully fit the training data and achieve comparable test performance to the original DeepRTE. Conversely, poor training fit and large test errors would refute our assumption and demonstrate the necessity of the scattering operator $\cS$. The experimental results, presented in Table~\ref{tab:ablation_g}, strongly support the latter conclusion. Notice the poor performance of $\ANN_{\text{w/o }\cS}$ on the dataset where scattering highly forward peaked (strong anisotropic). This significant degradation in performance compared to the full DeepRTE model clearly indicates that the scattering operator $\cS$ is essential for accurately modeling the RTE solution operator.
+\begin{table}[htbp]
+	\centering
+	\begin{tabular}{@{}lcccc@{}}
+		\toprule
+		Model                                                        & Scattering regime      & $g$ range   & MSE                    & RMSPE (\%) \\
+		\midrule
+		\multirow{3}{*}{Without scattering: $\ANN_{\text{w/o }\cS}$} & Near isotropy          & $(0,\,0.2)$ & $2.657\times10^{-2}$   & $8.251$    \\
+		                                                             & Moderate anisotropy    & $(0.4,0.6)$ & $6.852\times10^{-2}$   & $11.395$   \\
+		                                                             & Highly forward peaking & $(0.7,0.9)$ & $7.257\times10^{-2}$   & $13.108$   \\
+		\midrule
+		\multirow{3}{*}{With scattering: $\ANN$}                     & Near isotropy          & $(0,\,0.2)$ & $1.065 \times 10^{-3}$ & 2.383      \\
+		                                                             & Moderate anisotropy    & $(0.4,0.6)$ & $1.127 \times 10^{-3}$ & 2.452      \\
+		                                                             & Highly forward peaking & $(0.7,0.9)$ & $1.853 \times 10^{-3}$ & 3.069      \\
+		\bottomrule
+	\end{tabular}
+	\caption{Performance across scattering anisotropy regimes (Heney–Greenstein parameter $g$).}
+	\label{tab:ablation_g}
+\end{table}
+
+\begin{remark}
+	We note that in our DeepRTE model, the lifting operator $\cL$~\eqref{eq:lifting-op} appears in both the attenuation module (see~\eqref{eq:L-op} and since $\mus$ is included in $\tau_{-}^{\text{NN}}$, see Remark~\ref{rmk:optical-depth-encoding}) and the scattering module (see~\eqref{eq:scattering-mus}). This design choice reflects our architectural principle of separating operations based on their mathematical domain: the attenuation module handles operators acting on spatial variables along characteristics (captured by attention mechanisms), while the scattering module handles operators acting on angular variables (captured by angular integration). This separation simplifies the model architecture and facilitates extensibility through repeating modular blocks.
+\end{remark}
+
+\subsection{Overall comparision with MIO}
+
+To evaluate the generalization performance of MIO, we trained it on a dataset where the parameter $g$ of the scattering kernel was uniformly distributed in the range $[0, 0.2]$. This training dataset is the same to the one used for DeepRTE to ensure a fair comparison.
+Furthermore, we varied the scale of MIO from small to large to examine how different MIO configurations affected the results on both the training and validation datasets. The results of this comparison are presented in Table~\ref{compare_table}.
+
+\begin{table}
+	\centering
+	\begin{tabular}{@{}llccccc@{}}
+		\toprule
+		\multirow{2}{*}{Models}                  &
+		\multirow{2}{*}{$\#$ of parameters}      &
+		\multicolumn{3}{c}{Training datasets}    &
+		\multicolumn{2}{c}{Evaluation datasets}
+		\\ \cmidrule(l){3-7}
+		                                         &                                    &
+		\begin{tabular}[c]{@{}c@{}}MSE
+		\end{tabular}           &
+		\begin{tabular}[c]{@{}c@{}}RMSPE \\ (\%)
+		\end{tabular} & \multicolumn{1}{l}{$\#$ of epochs} &
+		\begin{tabular}[c]{@{}c@{}}MSE
+		\end{tabular}           &
+		\begin{tabular}[c]{@{}c@{}}RMSPE \\ (\%)
+		\end{tabular}                                                      \\ \midrule
+		\multicolumn{1}{c}{\multirow{3}{*}{MIO}} &
+		\multicolumn{1}{c}{244960}               & $1.690\times 10^{-4}$
+		                                         & $65.60\%$
+		                                         & 100000                             & $1.984\times
+		10^{-4}$                                 & $72.49\%$
+		\\
+		\multicolumn{1}{c}{}                     &
+		\multicolumn{1}{c}{\num{4351744}}        & $4.119\times 10^{-6}$
+		                                         & $10.57\%$
+		                                         & 100000                             & $1.319\times
+		10^{-4}$                                 & $59.09\%$
+		\\
+		\multicolumn{1}{c}{}                     &
+		\multicolumn{1}{c}{8171520}              & $2.140\times 10^{-6}$
+		                                         & $7.58\%$
+		                                         & 100000                             & $9.912\times
+		10^{-5}$                                 & $51.23\%$
+		\\ \midrule
+		DeepRTE                                  &
+		\multicolumn{1}{c}{37954}                & $8.210 \times
+		10^{-9}$                                 & $3.16\%$
+		                                         & 5000                               &
+		$5.630 \times 10^{-10}$                  & $2.83\%$
+		%  \\ \multicolumn{1}{l}{}                                &
+		% \multicolumn{1}{l}{}
+		\\ \bottomrule
+	\end{tabular}
+	\caption{Performance comparison between MIO and DeepRTE frameworks on radiation transport equation solving. MIO results are shown for three different parameter configurations, while DeepRTE achieves superior accuracy with significantly fewer parameters and training epochs.}\label{compare_table}
+\end{table}
+
+The comparison shows that while MIO's performance on the training dataset improves as parameters increase, it still has significant errors on the validation dataset sampled from the same distribution as the training set. This observation highlights MIO's limited generalization capability, despite its ability to fit the training data well. Even after extensive parameter adjustments, MIO struggles to accurately predict the solution function for unseen inputs from the same distribution as the training set and fails to capture the underlying physical principles that control the RTE.
+
+In contrast, DeepRTE's architecture enables it to generalize well to unseen inputs, both within the same distribution and in zero-shot settings. By directly involving the physical information in the attenuation and scattering modules, along with the Green's function integral, DeepRTE uses the fundamental structure of the RTE to make accurate predictions. This ability to generalize beyond the training data is very important for practical applications.

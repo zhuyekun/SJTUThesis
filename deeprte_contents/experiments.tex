@@ -1,0 +1,557 @@
+\section{Experiments and results}\label{sec:experiments}
+In this section, we present the numerical experiments and results to verify the effectiveness of DeepRTE.
+In practice, the RTE~\eqref{eq:rte} is a $6$-dimensional equation in the position variable $\br\in\mathbb{R}^3$ and angular variable $\bOmega\in\sS^2$ corresponding to $d=3$.
+It can be reduced to lower dimensional equations.
+In the Cartesian coordinate system, let
+\begin{equation}
+	\bOmega=(c,s,\zeta), \quad c =
+		{\left(1-\zeta^{2}\right)}^{\frac{1}{2}} \cos\theta, \quad s =
+		{\left(1-\zeta^{2}\right)}^{\frac{1}{2}} \sin\theta, \quad \text{for }|\zeta| \leq 1.
+\end{equation}
+Suppose that $\mut, \mus$ only depend on $x$, $y$ and $I$ is uniform along the $z$-axis. The functions
+\begin{equation}
+	\tilde{I}(x, y,\zeta,\theta) = \frac{1}{2}[I(x,y,z,c,s,\zeta) + I(x,y,z,c,s,-\zeta)],
+\end{equation}
+and
+\begin{equation}
+	\tilde{p}(\zeta,\theta,\zeta^*, \theta^*) = \frac{1}{2}[p(c,s,\zeta, c^*,s^*,\zeta^*) + p(c,s,\zeta, c^*,s^*,-\zeta^*)],
+\end{equation}
+are independent of $z$ and even in $\zeta$. Thus, Eq.~\eqref{eq:rte-with-bc} reduces to the following equation:
+\begin{equation}
+	\left(c\partial_x \tilde{I}(x,y,\zeta,\theta)+s\partial_y
+	\tilde{I}(x,y,\zeta,\theta)\right)+\mut \tilde{I}(x,y,\zeta,\theta)=\frac{\mus}{2\pi}\int_{0}^{1}
+	\int_0^{2\pi} \tilde{p}(\zeta, \theta, \zeta^*,\theta^*) \tilde{I}(x,y,\zeta^*,\theta^*) \diff{\theta^*}\diff{\zeta^*},
+\end{equation}
+with inflow boundary condition:
+\begin{equation}
+	\tilde{I}(x,y,\bOmega)=\tilde{I}_{-}(x,y,\bOmega), \quad \text{for }
+	\bOmega\cdot\bm{n}<0,\quad (x, y)\in\partial D.
+\end{equation}
+
+The phase function $p$ is essential in the radiative transport equation and typically depends only on the angle between the incoming and outgoing directions. A common model for anisotropic scattering is the normalized Henyey-Greenstein (H-G) phase function, given by
+\begin{equation}
+	p(\bOmega,\bOmega^*) = p(\bOmega\cdot\bOmega^*) = \frac{1-g^2}{{\Bigl(1+g^2-2g\,(cc^*+ss^*+\zeta\zeta^*)\Bigr)}^{\frac{3}{2}}}.
+\end{equation}
+The asymmetry parameter $g$ can be adjusted to control the relative amounts of forward and backward scattering in $p$: $g=0$ corresponds to isotropic scattering, and $g=1$ gives highly peaked forward scattering. Although we use the H-G function here, the algorithm can be easily adapted to other scattering models.
+
+\subsection{Dataset construction}\label{sec:dataset-construction}
+
+The datasets for training and evaluating are generated using conventional numerical methods, i.e., sweeping method~\cite{koch1991solution,zeyao2004parallel}.
+The source code is written in MATLAB and Python and is available at \href{https://github.com/mazhengcn/rte-dataset}{rte-dataset}.
+
+\paragraph{Computational domain and discretization}
+We conduct our numerical experiments on a rectangular spatial domain $D = [0, 1]\times[0, 1]\subset \mathbb{R}^2$ and angular variable space $\mathbb{S}^{2}$.
+The number of discrete mesh points in each direction is $40$, and these points are uniformly distributed.
+% Grid points are randomly sampled from discrete grid points following a uniform distribution.
+
+\paragraph{Angular quadrature points}
+The angular quadrature points are the positive roots of the
+standard Legendre polynomial of degree $2N$ on the interval $[-1,1]$.
+Here we take $N=3$, the quadrature points and weights of the
+quadrature set are presented in Table~\ref{tab:quadrature}.
+
+\begin{table}[htbp]
+	\centering
+	\begin{tabular}{ccccc}
+		\toprule
+		$\zeta_i$ & $\theta_i$ & $c_i$     & $s_i$     & $4 w_i$   \\
+		\midrule
+		0.2386192 & $\pi$/12   & 0.9380233 & 0.2513426 & 0.1559713 \\
+		0.2386192 & 3$\pi$/12  & 0.6866807 & 0.6866807 & 0.1559713 \\
+		0.2386192 & 5$\pi$/12  & 0.2513426 & 0.9380233 & 0.1559713 \\
+		0.6612094 & $\pi$/8    & 0.6930957 & 0.2870896 & 0.1803808 \\
+		0.6612094 & 3$\pi$/8   & 0.2870896 & 0.6930957 & 0.1803808 \\
+		0.9324695 & $\pi$/4    & 0.2554414 & 0.2554414 & 0.1713245 \\
+		\bottomrule
+	\end{tabular}
+	\caption{Angular quadrature points and weights of the quadrature set.
+		$\zeta_i$ and $\theta_i$ are the quadrature points of the velocity
+		space, $c_i$ and $s_i$ are the corresponding cosine and sine
+		values, and $w_i$ is the quadrature weight.}\label{tab:quadrature}
+\end{table}
+
+\paragraph{Cross section}
+The cross section $\mu_t(x,y)$ and $\mu_s(x,y)$ are defined based on the subdomain $D_\mu = [0.4, 0.6] \times [0.4, 0.6]$. The detailed definitions are:
+\begin{equation} \label{eq:coefficients_definition}
+	\begin{aligned}
+		\mu_t(x,y) & =
+		\begin{cases}
+			U_t, \quad \text{where } U_t \sim \mathcal{U}(5,7) & \text{if } (x,y) \in D_\mu    \\
+			10                                                 & \text{if } (x,y) \notin D_\mu
+		\end{cases} \\
+		\mu_s(x,y) & =
+		\begin{cases}
+			U_s, \quad \text{where } U_s \sim \mathcal{U}(2,4) & \text{if } (x,y) \in D_\mu    \\
+			5                                                  & \text{if } (x,y) \notin D_\mu
+		\end{cases}
+	\end{aligned}
+\end{equation}
+
+\paragraph{Training dataset boundary conditions}
+The training dataset uses delta-function inflow boundary conditions, approximated by Gaussian functions:
+% The smoothed delta function, $\delta_{x^{\prime}}^\sigma(x)$, used to construct these beams is defined as:
+% \begin{equation} \label{eq:smoothed_delta_redefined}
+%   \delta_{{x^{\prime}}}^\sigma(x)=\frac{1}{\sigma \sqrt{\pi}}
+%   \exp\Bigl(-\frac{{(x-x^{\prime})}^{2}}{\sigma^{2}}\Bigr).
+% \end{equation}
+% The incoming boundary conditions for the training dataset are:
+\begin{equation}\label{eq:bc-condition}
+	\centering
+	\left \{ % tex-fmt: skip
+	\begin{aligned}
+		 & I_-(x=0,y,c>0,s;x_l^{\prime}=0,
+		y_l^{\prime},c_l^{\prime},s_l^{\prime})
+		=\delta_{\{y_l^{\prime}\}}^{\sigma_{\br}}(y)\delta^{\sigma_{\bOmega}}(c - c_l')\delta^{\sigma_{\bOmega}}(s - s_l'),
+		\\
+		 & I_-(x=1,y,c<0,s;x_r^{\prime}=1,
+		y_r^{\prime},c_r^{\prime},s_r^{\prime})
+		=\delta_{\{y_r^{\prime}\}}^{\sigma_{\br}}(y)\delta^{\sigma_{\bOmega}}(c - c_r')\delta^{\sigma_{\bOmega}}(s - s_r'),
+		\\
+		 & I_-(x,y=0,c,s>0;x_b^{\prime},y_b^{\prime}=0, c_b^{\prime},
+		s_b^{\prime})
+		=\delta_{\{x_b^{\prime}\}}^{\sigma_{\br}}(x)\delta^{\sigma_{\bOmega}}(c - c_b')\delta^{\sigma_{\bOmega}}(s - s_b'),
+		\\
+		 & I_-(x,y=1,c,s<0;x_t^{\prime},y_t^{\prime}=1,c_t^{\prime},
+		s_t^{\prime})
+		=\delta_{\{x_t^{\prime}\}}^{\sigma_{\br}}(x)\delta^{\sigma_{\bOmega}}(c - c_t')\delta^{\sigma_{\bOmega}}(s - s_t'),
+	\end{aligned}
+	\right. % tex-fmt: skip
+\end{equation}
+where the variables $y_l'$ (left), $y_r'$ (right), $x_b'$ (bottom), and $x_t'$ (top) are uniformly sampled from discrete mesh points along the corresponding boundary.
+The angular variables $c_l'$, $c_r'$, $c_b'$, $c_t'$, $s_l'$, $s_r'$, $s_b'$, and $s_t'$ are uniformly sampled from discrete velocity directions that satisfy the inflow boundary conditions. The parameters $\sigma_{\br}$ and $\sigma_{\bOmega}$ are drawn from uniform distributions $\sigma_{\br} \sim \mathcal{U}(0.005\sqrt{2},0.02\sqrt{2})$ and $\sigma_{\bOmega} \sim \mathcal{U}(0.005\sqrt{2},0.01\sqrt{2})$, respectively.
+
+\paragraph{Dataset normalization}
+In training process, the intensity $I$ was normalized to the range $[0, 1]$ using the formula $(I - I_{\text{min}}) / (I_{\text{max}} - I_{\text{min}})$, where $I_{\text{min}}$ and $I_{\text{max}}$ represent the minimum and maximum intensity values observed in the dataset, respectively. This normalization helps stabilize the training process and improve model convergence.
+
+% \begin{itemize}
+%     \item $y_l'$ and $y_r'$ are the y-coordinates for the center of beams on the left ($x_0=0$) and right ($x_0=1$) edges, respectively. Similarly, $x_b'$ and $x_t'$ are the x-coordinates for beams on the bottom ($y_0=0$) and top ($y_0=1$) edges. These source coordinates are uniformly sampled from discrete grid points along the respective boundary.
+%     \item $c'$ and $s'$ (representing $c_0, s_0$ in the definition of $P$) define the central angular direction of the incident beam.
+%     \item $\sigma_{\br}$ and $\sigma_{\bOmega}$ control the spatial and angular spread of the Gaussian beams. They are sampled from uniform distributions: $\sigma_{\br} \sim \mathcal{U}(0.005\sqrt{2},\,0.02\sqrt{2})$ and $\sigma_{\bOmega} \sim \mathcal{U}(0.005\sqrt{2},\,0.01\sqrt{2})$.
+% \end{itemize}
+
+\paragraph{Scattering regimes}
+The model was trained and tested across three distinct scattering regimes, defined by the scattering asymmetry parameter $g \in [0,1]$ (where $g=0$ denotes isotropic scattering and $g=1$ denotes fully forward-peaked scattering). The regimes are as follows:
+\begin{itemize}\label{li:regimes}
+	\item \textbf{Near isotropy}: \( g \sim \mathcal{U}(0, 0.2) \), characterized by nearly isotropic scattering, where light or neutrons scatter in all directions equally.
+	\item \textbf{Moderate anisotropy}: \( g \sim \mathcal{U}(0.4, 0.6) \), representing a middle ground where scattering is neither fully isotropic nor strongly directional.
+	\item \textbf{Highly forward peaking}: \( g \sim \mathcal{U}(0.7, 0.9) \),  where particles (photons/neutrons) scatter predominantly forward, similar to a spotlight. This presents modeling challenges because: (1) particle paths become highly correlated; (2) their positions and scattering directions are closely linked; and (3) minor changes in boundary conditions can drastically affect the results.
+\end{itemize}
+Table~\ref{tab:dataset} summarizes the parameters used in the dataset construction.
+\begin{table}[htbp]
+	\centering
+	\begin{tabular}{lp{0.3\textwidth}ll}
+		\toprule
+		Category                             & Parameters                                      & Symbol                   & Value/Range                                     \\ \midrule
+		\multirow{2}{*}{Spatial domain}      & Domain                                          & $D$                      & ${[0,1]}^2$                                     \\
+		                                     & Subdomain                                       & $D_\mu$                  & ${[0.4,0.6]}^2$                                 \\
+		\midrule
+		\multirow{4}{*}{Cross section}       & \multirow{2}{*}{Total}                          & \multirow{2}{*}{$\mut$}  & $\mathcal{U}(5,7)$ in $D_\mu$                   \\
+		                                     &                                                 &                          & $10$ in $D\backslash D_\mu$                     \\
+		                                     & \multirow{2}{*}{Scattering}                     & \multirow{2}{*}{$\mus$}  & $\mathcal{U}(2,4)$ in $D_\mu$                   \\
+		                                     &                                                 &                          & $5$ in $D\backslash D_\mu$                      \\
+		\midrule
+		\multirow{2}{*}{Discretization}      & \# of mesh points                               & $N_{\text{mesh}}$        & 40                                              \\
+		                                     & \# of angular quadrature points                 & $N_\text{quad}$          & 24                                              \\ \midrule
+		\multirow{5}{*}{Boundary conditions} & Beam spatial center coordinates                 & $y_l', y_r', x_b', x_t'$ & Sampled from mesh points                        \\
+		                                     & \multirow{2}{*}{Beam angular quadrature points} & $c_l', c_r', c_b', c_t'$ & \multirow{2}{*}{Sampled from quadrature points} \\
+		                                     &                                                 & $s_l', s_r', s_b', s_t'$ &                                                 \\
+		                                     & Beam spatial std dev                            & $\sigma_{\br}$           & $\sqrt{2}\,\mathcal{U}(0.005, 0.02)$            \\
+		                                     & Beam angular std dev                            & $\sigma_{\bOmega}$       & $\sqrt{2}\,\mathcal{U}(0.005, 0.01)$            \\
+		\midrule
+		\multirow{3}{*}{Scattering}          & \multirow{3}{*}{Asymmetry parameter}            & \multirow{3}{*}{$g$}     & $\mathcal{U}(0,0.2)$                            \\
+		                                     &                                                 &                          & $\mathcal{U}(0.4,0.6)$                          \\
+		                                     &                                                 &                          & $\mathcal{U}(0.7,0.9)$                          \\
+		\bottomrule
+	\end{tabular}
+	\caption{Summary of hyperparameters for dataset construction. This table details the computational domain, cross sections, discretization, boundary conditions, and other parameters used.}\label{tab:dataset}
+\end{table}
+
+\subsection{Training details}
+
+\paragraph{Training configuration}
+
+\begin{table}[htbp]
+	\centering
+	\begin{tabular}{ll}
+		\toprule
+		Hyperparameters          & Value                      \\ \midrule
+		Optimizer                & Adam                       \\
+		Learning rate schedule   & Cosine annealing           \\
+		Initial learning rate    & $1 \times 10^{-3}$         \\
+		Batch size               & 8                          \\
+		Epochs                   & 5000                       \\
+		\# of training data      & 800                        \\
+		\# of validation data    & 200                        \\
+		\# of collocation points & 128                        \\
+		Hardware                 & 4$\times$ NVIDIA 4090 GPUs \\
+		\bottomrule
+	\end{tabular}
+	\caption{Summary of model training hyperparameters. This table details the optimizer and training hyperparameters, including learning rate, dataset settings, and hardware information.}
+	\label{tab:training_details}
+\end{table}
+The model was trained using the Adam optimizer with a cosine annealing learning rate schedule.
+The training process involved 800 samples per scattering regime, and its performance was evaluated on a separate validation set of 200 samples per regime.
+Training was conducted on four NVIDIA 4090 GPUs and proceeded for 5000 epochs.
+The initial learning rate was set to $1 \times 10^{-3}$, the batch size was 8, and the number of collocation points used in the loss computation (see Eq.~\eqref{eq:collocation_points}) was 128.
+Table~\ref{tab:training_details} summarizes the training hyperparameters.
+
+\paragraph{Network architecture}
+The neural network hyperparameters of DeepRTE are detailed in Table~\ref{tab:parameters}.
+
+\begin{table}[htbp]
+	\centering
+	\begin{tabular}{lll}
+		\toprule
+		Module Name                  & Hyperparameters                          & Value \\ \midrule
+		\multirow{7}{*}{Attenuation} & \texttt{num\_layer}
+		$N_{\text{mlp}}$             & 4                                                \\
+		                             & \texttt{hidden\_dim}  $d_{\text{mlp}}$   & $128$ \\
+		                             & \texttt{output\_dim}  $d_{\text{model}}$ & $16$  \\
+		                             & \texttt{num\_head}    $N_{\text{head}}$  & $2$   \\
+		                             & \texttt{key\_dim}     $d_k$              & $32$  \\
+		                             & \texttt{value\_dim}   $d_v$              & $32$  \\
+		                             & \texttt{output\_dim}  $d_{\tau}$         & $2$   \\
+		\midrule
+		\multirow{2}{*}{Scattering}  & \texttt{num\_block}   $N_{\ell}$         & $2$   \\
+		                             & \texttt{latent\_dim}  $d_{\text{model}}$ & $16$  \\
+		\bottomrule
+	\end{tabular}
+	\caption{DeepRTE network hyperparameters. The network consists of two modules: the attenuation module and the scattering module. The hyperparameters include the number of layers, hidden dimensions, output dimensions, number of heads, key dimensions, value dimensions, and latent dimensions.}\label{tab:parameters}
+\end{table}
+
+\subsection{Results}
+\subsubsection{Accuracy validation}
+\label{sec:acc}
+This section evaluates the model's accuracy and computational efficiency. Accuracy is measured using the mean squared error (MSE) and root mean squared percentage error (RMSPE) between predictions and ground truth. All experimental findings presented in this subsection are derived from a validation dataset with identical distribution to the training dataset.
+
+\begin{table}[htbp]
+	\centering
+	\begin{tabular}{@{}cccccc@{}}
+		\toprule
+		Model                    & \# of parameters       & Scattering regime      & \(g\) range & MSE (\(\times 10^{-10}\)) & RMSPE (\%) \\ \midrule
+		\multirow{3}{*}{DeepRTE} & \multirow{3}{*}{37954} & Near isotropy          & (0, 0.2)    & 5.630                     & 2.827      \\ \cmidrule(l){3-6}
+		                         &                        & Moderate anisotropy    & (0.4, 0.6)  & 5.453                     & 2.759      \\ \cmidrule(l){3-6}
+		                         &                        & Highly forward peaking & (0.7, 0.9)  & 7.223                     & 3.181      \\ \bottomrule
+	\end{tabular}
+	\caption{Accuracy validation of DeepRTE model across three distinct scattering regimes. All validation experiments were conducted on a dataset sharing the same distribution as the training dataset. The table demonstrates that the model achieves high accuracy with RMSPE consistently below 3.2\% across all regimes.}\label{tab:accuracy}
+\end{table}
+
+Across all regimes, DeepRTE achieved an MSE not exceeding \(7.3 \times 10^{-10}\) and an RMSPE below 3.2\%, indicating high accuracy. Specifically, in the near isotropy regime, the MSE was \(5.630 \times 10^{-10}\) with an RMSPE of 2.827\%, reflecting excellent performance in nearly isotropic conditions. For moderate anisotropy regime, the MSE was slightly lower at \(5.453 \times 10^{-10}\), with an RMSPE of 2.759\%, showing comparable accuracy. Notably, in the highly forward peaking regime, where modeling is typically more challenging due to the directional nature of photon transport, the model recorded an MSE of \(7.223 \times 10^{-10}\) and an RMSPE of 3.181\%, demonstrating robust performance despite the increased complexity.
+
+Table~\ref{tab:accuracy-figs} provides visual comparisons of $\Phi$ predictions for representative cases across three scattering regimes. For each regime, we display: (1) 3D ground truth, (2) 2D ground truth projection, (3) model prediction, and (4) absolute error between prediction and ground truth.
+
+The Table~\ref{tab:time_compare} presents a runtime comparison between DeepRTE and traditional methods, highlighting the efficiency gains achieved by our approach. The fast sweeping method was implemented in two variants: a CPU implementation (Python with NumPy and SciPy) measured on an Intel(R) Xeon(R) Silver 4410Y (12 cores), which requires $193.0$ s, and a highly optimized GPU implementation (JAX with data sharding across devices, multi-GPU parallelism, and \texttt{jax.jit} for JIT (Just-in-Time) compilation, see Alg.~\ref{alg:fast-sweeping-gpu}) measured on $4\times$ NVIDIA GeForce RTX 4090, which requires $16.7$ s ($11.6\times$ speedup over the CPU). By contrast, DeepRTE performs inference in $2.3$ s on $4\times$ RTX 4090, achieving a $ 7.3\times$ speedup over the fast sweeping method on GPU and an $83.9\times$ speedup relative to the CPU baseline.
+
+These results show that DeepRTE effectively captures the physics of scattering across different parameter settings.
+The model achieves low error rates even in complex forward scattering scenarios.
+With only $37,954$ parameters, DeepRTE ensures computational efficiency.
+These characteristics make it well-suited for large-scale simulations requiring fast processing.
+
+\begin{table}[htbp]
+	\centering
+	\begin{tabular}{@{}lccc@{}}
+		\toprule
+		Method                     & Device                        & Count    & Time (s) \\ \midrule
+		Fast sweeping method (CPU) & Intel(R) Xeon(R) Silver 4410Y & 12 cores & 193.0    \\
+		Fast sweeping method (GPU) & NVIDIA GeForce RTX 4090       & 4 GPUs   & 16.7     \\
+		\midrule
+		DeepRTE (GPU)              & NVIDIA GeForce RTX 4090       & 4 GPUs   & 2.3      \\ \bottomrule
+	\end{tabular}
+	\caption{Runtime comparison. The conventional fast sweeping method requires 193.0 s on an Intel(R) Xeon(R) Silver 4410Y (12 cores) and 16.7 s on $4\times$ NVIDIA GeForce RTX 4090 GPUs ($11.6\times$ over CPU). By contrast, DeepRTE completes inference in 2.3 s on $4\times$ RTX 4090, achieving a $7.3\times$ speedup over the GPU fast sweeping method and an $83.9\times$ speedup relative to the CPU baseline.}
+	\label{tab:time_compare}
+\end{table}
+
+\begin{algorithm}[!htbp]
+	\caption{Multi-GPU Fast-Sweeping Method}\label{alg:fast-sweeping-gpu}
+	\small
+	$\Def \text{ FastSweeping}(\mu_t, \mu_s, \{c_k\}, \{s_k\}, \{w_{k'}\}, p, \Delta x, \Delta y, D=4, \text{tol}=10^{-8}, \text{max\_iter}=1000)$:
+	\begin{algorithmic}[1]
+		\Comment{Data sharding: partition angular flux and scattering kernel across $D$ devices}
+		\State$M \gets n_v / D$
+		\Comment{Shard angular flux and scattering kernel; replicate cross-sections}
+		\ForAll{device $d \in \{1,\dots,D\}$}
+		\State$I^{d,[\ell]}_{i, j, k} \gets \texttt{jax.zeros}(n_x, n_y, M)$ \hfill $I^{d,[\ell]}_{i,j,k} \in \mathbb{R}^{n_x \times n_y \times M}$
+		\State$p^d_{k,k'} \gets p_{k,k'}$ for $k \in [(d-1)M, dM)$ and all $k'$
+		\Comment{Replicate material cross-sections to all devices}
+		\State$\mu_t^d, \mu_s^d \gets \mu_t, \mu_s$
+		\EndFor
+		\Comment{Source iteration with convergence check}
+		\ForAll{iteration $\ell \in [0, \text{max\_iter})$}
+		\Statex{\hspace{1.5em}\color{Brown}\small\textit{\# \;Step 1: All-gather angular fluxes from all devices (cross-device communication)}}
+		\State$I_{i,j,k'}^{[\ell]} \gets \text{All-Gather}(\{I_{i,j, k}^{d,[\ell]}\}_{d=1}^D)$ \hfill $k' \in [0, n_v)$
+		\ForAll{device $d$ \textbf{in parallel}}
+		\Statex{\hspace{1.5em}\color{Brown}\small\textit{\# \;Step 2: Compute local scattering moments on each device (local computation, no communication)}}
+		\State$S^{d,[\ell]}_{i,j,k} \gets \displaystyle\sum_{k'=0}^{n_v-1} w_{k'}\, p^d_{k,k'}\,I^{[\ell]}_{i,j,k'}$ \hfill $k \in [(d-1)M, dM)$
+		\Statex{\hspace{1.5em}\color{Brown}\small\textit{\# \;Step 3: Perform local angular sweeps on each device (local computation, no communication)}}
+		\ForAll{$i,j$ \textit{in sweep order}}
+		\State$I^{d,[\ell+1]}_{i,j,k} \gets \dfrac{c_k\dfrac{I^{d,[\ell]}_{i-1,j,k}}{\Delta x} + s_k\dfrac{I^{d,[\ell]}_{i,j-1,k}}{\Delta y} + (\mu_s)_{i,j}\,S^{d,[\ell]}_{i,j,k}}{\dfrac{c_k}{\Delta x} + \dfrac{s_k}{\Delta y} + (\mu_t)_{i,j}}$ \hfill $k \in [(d-1)M, dM)$
+		\EndFor
+		\EndFor
+		\Comment{Check convergence}
+		\If{$\text{RelativeError}(I^{[\ell+1]}, I^{[\ell]}) < \text{tol}$}
+		\State\textbf{break}
+		\EndIf
+		\EndFor
+		\Comment{Gather all angular fluxes from devices}
+		\State$I^{[\ell]} \gets \text{All-Gather}(\{I^{d,[\ell]}\}_{d=1}^D)$
+		\Ret$I^{[\ell]}$
+	\end{algorithmic}
+\end{algorithm}
+
+\begin{table}[htbp]
+	\centering
+	\begin{tabular}{>{\centering\arraybackslash}m{0.9cm}cccc}
+		\toprule
+		$g$                         & $\Phi_{\text{label}}$                                             & $\Phi_{\text{label}}$                                          & $\Phi_{\text{predict}}$                                      & $|\Phi_{\text{label}}- \Phi_{\text{predict}}|$                 \\
+		\midrule
+		\raisebox{5em}{$(0,0.2)$}   & \includegraphics[width=0.22\textwidth]{val_g0.1_phi_label_3d.pdf} & \includegraphics[width=0.20\textwidth]{val_g0.1_phi_label.pdf} & \includegraphics[width=0.20\textwidth]{val_g0.1_phi_pre.pdf} & \includegraphics[width=0.20\textwidth]{val_g0.1_phi_error.pdf} \\
+		\raisebox{5em}{$(0.4,0.6)$} & \includegraphics[width=0.22\textwidth]{val_g0.5_phi_label_3d.pdf} & \includegraphics[width=0.20\textwidth]{val_g0.5_phi_label.pdf} & \includegraphics[width=0.20\textwidth]{val_g0.5_phi_pre.pdf} & \includegraphics[width=0.20\textwidth]{val_g0.5_phi_error.pdf} \\
+		\raisebox{5em}{$(0.7,0.9)$} & \includegraphics[width=0.22\textwidth]{val_g0.8_phi_label_3d.pdf} & \includegraphics[width=0.20\textwidth]{val_g0.8_phi_label.pdf} & \includegraphics[width=0.20\textwidth]{val_g0.8_phi_pre.pdf} & \includegraphics[width=0.20\textwidth]{val_g0.8_phi_error.pdf} \\
+		\bottomrule
+	\end{tabular}\caption{Visual comparison of density $\Phi$ predictions across scattering regimes: ground truth (3D and 2D views), model predictions, and absolute errors for representative validation cases.}\label{tab:accuracy-figs}
+\end{table}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\textwidth]{train_loss.pdf}
+	\caption{Loss curve. Obtained from training the model on a delta function training dataset, illustrating the convergence behavior over epochs.}\label{fig:loss}
+\end{figure}
+
+\input{contents/linearity_val.tex}
+
+\subsubsection{Transfer learning and zero-shot performance}
+
+In this section, we explore the DeepRTE framework's capabilities in transfer learning and Zero-Shot performance. Transfer learning enables a model to leverage knowledge from one task for improved performance on a related task, while Zero-Shot capability allows immediate application to entirely new conditions without retraining. To demonstrate these properties for the Radiative Transfer Equation (RTE)—specifically its ability to adapt to novel boundary conditions with minimal or no additional training—we train the model on datasets featuring delta function boundary conditions. The goal is to learn the RTE's fundamental physical principles. Subsequently, we evaluate the model on boundary conditions sampled from an entirely distinct data distribution (different from those in the training set), assessing its generalization capacity and Zero-Shot performance.
+% —its ability to predict solutions for entirely new boundary conditions without further training.
+
+To evaluate the model, we consider the following three specific boundary condition cases:
+\begin{itemize}
+	\item \textbf{Case I (Constant boundary conditions):} This case tests the model's generalization capability from the delta function boundary conditions used in training to a uniform source. It serves as a baseline for evaluating fundamental generalization.
+	\item \textbf{Case II (Trigonometric boundary conditions):} This case introduces spatial changes using a sine function, assessing the model's ability to handle smooth, periodic, and spatially dependent boundary conditions.
+	\item \textbf{Case III (Velocity dependent boundary conditions):} This case evaluates the model's performance with more complex, nonlinear boundary conditions that introduce directional dependence.
+\end{itemize}
+
+\paragraph{Case I. Constant boundary conditions}
+The boundary conditions of the problem are
+\begin{equation}
+	\left \{
+	\begin{aligned}
+		 & I_-(x=0,y,c>0,s) =1,  \\
+		 & I_-(x=1,y,c<0,s) = 0, \\
+		 & I_-(x,y=0,c,s>0) =0,  \\
+		 & I_-(x,y=1,c,s<0) =0,
+	\end{aligned}
+	\right.
+\end{equation}
+\begin{figure}[htbp]
+	\centering
+	\begin{subfigure}[b]{0.24\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{test_bc1_g0.1_label_3d.pdf}
+		\caption{$\Phi_{\text{label}}$ (3D)}\label{fig:caseI_label_3d}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}[b]{0.24\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{test_bc1_g0.1_label.pdf}
+		\caption{$\Phi_{\text{label}}$}\label{fig:caseI_label}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}[b]{0.24\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{test_bc1_g0.1_pre.pdf}
+		\caption{$\Phi_{\text{predict}}$}\label{fig:caseI_predict}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}[b]{0.24\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{test_bc1_g0.1_error.pdf}
+		\caption{Absolute error}\label{fig:caseI_error}
+	\end{subfigure}
+	\caption{Evaluation dataset with scattering kernel coefficient
+		$g\in (0,0.2)$. The RMSPE of the predicted solution is 2.573\%}
+\end{figure}
+
+\paragraph{Case II.\@ Trigonometric boundary conditions}
+The boundary conditions of the problem are
+\begin{equation}
+	\left \{
+	\begin{aligned}
+		 & I_-(x=0,y,c>0,s) =a_L\sin{k_L y}+5,   \\
+		 & I_-(x=1,y,c<0, s) = a_R\sin{k_R y}+5, \\
+		 & I_-(x,y=0,c,s>0) =a_B\sin{k_B x}+5,   \\
+		 & I_-(x,y=1,c,s<0) =a_T\sin{k_T x}+5,
+	\end{aligned}
+	\right.
+\end{equation}
+
+where
+\begin{equation}
+	a_L, a_R, a_B, a_T \sim \mathcal{U}(-5,5), \quad
+	k_L, k_R, k_B, k_T \sim\mathcal{U}(-10, 10).
+\end{equation}
+\begin{figure}[htbp]
+	\centering
+	\begin{subfigure}[b]{0.24\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{test_sin_g0.1_label_3d.pdf}
+		\caption{$\Phi_{\text{label}}$ (3D)}\label{fig:caseII_label_3d}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}[b]{0.24\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{test_sin_g0.1_label.pdf}
+		\caption{$\Phi_{\text{label}}$}\label{fig:caseII_label}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}[b]{0.24\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{test_sin_g0.1_pre.pdf}
+		\caption{$\Phi_{\text{predict}}$}\label{fig:caseII_predict}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}[b]{0.24\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{test_sin_g0.1_error.pdf}
+		\caption{Absolute error}\label{fig:caseII_error}
+	\end{subfigure}
+	\caption{Evaluation data set with scattering kernel coefficient
+		$g\in (0,0.2)$. The RMSPE of the predict solution is 1.968\%}
+\end{figure}
+
+\paragraph{Case III.\@ Velocity dependent boundary conditions}The boundary conditions of the problem are
+\begin{equation}
+	\left \{
+	\begin{aligned}
+		 & I_-(x=0,y,c>0,s) =(a_{Lr}\sin{k_{Lr} y}+5)(a_{Lv}\sin{k_{Lv} c}+1)(a_{Lv}\sin{k_{Lv} s}+1),  \\
+		 & I_-(x=1,y,c<0,s) = (a_{Rr}\sin{k_{Rr} y}+5)(a_{Rv}\sin{k_{Rv} c}+1)(a_{Rv}\sin{k_{Rv} s}+1),
+		\\
+		 & I_-(x,y=0,c,s>0) =(a_{Br}\sin{k_{Br} x}+5)(a_{Bv}\sin{k_{Bv} c}+1)(a_{Bv}\sin{k_{Bv} s}+1),
+		\\
+		 & I_-(x,y=1,c,s<0) =(a_{Tr}\sin{k_{Tr} x}+5)(a_{Tv}\sin{k_{Tv} c}+1)(a_{Tv}\sin{k_{Tv} s}+1),
+	\end{aligned}
+	\right.
+\end{equation}
+
+where
+\begin{equation}
+	\begin{aligned}
+		a_{Lr}, a_{Rr}, a_{Br}, a_{Tr} & \sim \mathcal{U}(-5,5),   \\
+		a_{Lv}, a_{Rv}, a_{Bv}, a_{Tv} & \sim \mathcal{U}(-1,1),   \\
+		k_{Lr}, k_{Rr}, k_{Br}, k_{Tr} & \sim\mathcal{U}(-10, 10), \\
+		k_{Lv}, k_{Rv}, k_{Bv}, k_{Tv} & \sim\mathcal{U}(-6, 6).
+	\end{aligned}
+\end{equation}
+\begin{figure}[htbp]
+	\centering
+	\begin{subfigure}[b]{0.24\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{test_sin_rv_g0.1_label_3d.pdf}
+		\caption{$\Phi_{\text{label}}$ (3D)}\label{fig:caseIII_label_3d}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}[b]{0.24\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{test_sin_rv_g0.1_label.pdf}
+		\caption{$\Phi_{\text{label}}$}\label{fig:caseIII_label}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}[b]{0.24\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{test_sin_rv_g0.1_pre.pdf}
+		\caption{$\Phi_{\text{predict}}$}\label{fig:caseIII_predict}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}[b]{0.24\textwidth}
+		\centering
+		\includegraphics[width=\textwidth]{test_sin_rv_g0.1_error.pdf}
+		\caption{Absolute error}\label{fig:caseIII_error}
+	\end{subfigure}
+	\caption{Evaluation data set with scattering kernel
+		coefficient $g\in (0,0.2)$. The RMSPE of the predict
+		solution is 1.908\%}
+\end{figure}
+
+\begin{table}[htbp]
+	\centering
+	\begin{tabular}{@{}cccc@{}}
+		\toprule
+		\textbf{}                 & Test dataset    & MSE                    & RMSPE (\%) \\ \midrule
+		\multirow{3}{*}{Case I}   & $g\in(0,0.2)$   & $4.390 \times 10^{-6}$ & 1.833      \\
+		                          & $g\in(0.4,0.6)$ & $5.184 \times 10^{-6}$ & 1.994      \\
+		                          & $g\in(0.7,0.9)$ & $1.474 \times 10^{-5}$ & 3.193      \\ \midrule
+		\multirow{3}{*}{Case II}  & $g\in(0,0.2)$   & $4.931 \times 10^{-4}$ & 1.653      \\
+		                          & $g\in(0.4,0.6)$ & $5.798 \times 10^{-4}$ & 1.827      \\
+		                          & $g\in(0.7,0.9)$ & $2.870 \times 10^{-3}$ & 3.572      \\ \midrule
+		\multirow{3}{*}{Case III} & $g\in(0,0.2)$   & $1.065 \times 10^{-3}$ & 2.383      \\
+		                          & $g\in(0.4,0.6)$ & $1.127 \times 10^{-3}$ & 2.452      \\
+		                          & $g\in(0.7,0.9)$ & $1.853 \times 10^{-3}$ & 3.069      \\ \bottomrule
+	\end{tabular}
+	\caption{Transfer learning and Zero-Shot performance. The model, trained on delta function boundary conditions, is tested on constant (Case I), trigonometric (Case II), and combined trigonometric (Case III) boundary conditions for $g$ in ranges (0,0.2), (0.4,0.6), and (0.7,0.9). Performance is measured using mean squared error (MSE) and root mean square percentage error (RMSPE), demonstrating robust generalization with errors below 3.2\% for Case I, 3.6\% for Case II, and 3.1\% for Case III.}
+\end{table}
+
+\input{contents/case_g0_99.tex}
+
+In conclusion, DeepRTE's transfer learning and zero-shot capabilities demonstrate its strength and effectiveness across different conditions for solving the radiative transport equation.
+By applying the core physical principles learned during training, DeepRTE can accurately predict solutions for entirely new boundary conditions, even without additional training.
+This ability to generalize and adapt to new problems highlights the potential of deep learning frameworks to advance scientific computing.
+
+
+\subsection{Mesh dependence and cross-resolution performance}
+
+An important characteristic of any numerical method for solving partial differential equations is its performance across various mesh resolutions. In this section, we test the mesh independence property of DeepRTE. This capability allows parameters learned on fine meshes to be effectively applied to coarser meshes without significant loss of accuracy.
+
+\begin{table}[htbp]
+	\centering
+	\begin{tabular}{cccc}
+		\toprule
+		Test dataset & Mesh resolution & MSE                    & RMSPE (\%) \\
+		\midrule
+		\multirow{3}{*}{Evaluation Dataset}
+		             & $40\times 40$   & $5.453\times 10^{-10}$ &
+		$2.759$                                                              \\
+		             & $20\times 20$   & $8.235 \times 10^{-9}$ &
+		$10.006$                                                             \\
+		             & $10\times 10$   & $9.476 \times 10^{-8}$ &
+		$34.346$                                                             \\
+		\midrule
+		\multirow{3}{*}{Case I}
+		             & $40\times 40$   & $4.390 \times 10^{-6}$ &
+		$1.833$                                                              \\
+		             & $20\times 20$   & $1.876 \times 10^{-5}$ &
+		$3.758$                                                              \\
+		             & $10\times 10$   & $1.243 \times 10^{-4}$ &
+		$9.276$                                                              \\
+		\midrule
+		\multirow{3}{*}{Case II}
+		             & $40\times 40$   & $4.931 \times 10^{-4}$ &
+		$1.653$                                                              \\
+		             & $20\times 20$   & $1.792 \times 10^{-2}$ &
+		$9.952$                                                              \\
+		             & $10\times 10$   & $3.687 \times 10^{-2}$ &
+		$13.798$                                                             \\
+		\midrule
+		\multirow{3}{*}{Case III}
+		             & $40\times 40$   & $1.065 \times 10^{-3}$ &
+		$2.383$                                                              \\
+		             & $20\times 20$   & $1.175 \times 10^{-2}$ &
+		$8.132$                                                              \\
+		             & $10\times 10$   & $4.511 \times 10^{-2}$ &
+		$15.477$                                                             \\
+		\bottomrule
+	\end{tabular}
+	\caption{Performance of DeepRTE across different resolutions and test sets. The Evaluation Dataset shows very high precision, with an MSE of $5.45\times10^{-10}$ on the $40\times 40$ grid. In contrast, Cases I-III show a consistent increase in error on coarser grids. This increase is mainly because of the limitations of numerical integration. With the second-order midpoint rule, halving the grid resolution should theoretically make the integration error four times larger, which matches our findings.}\label{tab:mesh_independence_multiple_testsets}
+\end{table}
+
+For the evaluation dataset and Case I, the root mean square percentage error rises from $1.8$--$2.8\%$ on the $40\times 40$ grid to $3.8$--$10\%$ on the $20\times 20$ grid. Cases II and III exhibit a larger but still manageable increase, with errors growing from $1.7$--$2.4\%$ to $8$--$10\%$ on the coarser grid.
+
+This fourfold error increase is expected due to the theoretical limitations of the second-order midpoint rule used for the outermost numerical integration. This represents a key finding: DeepRTE has successfully learned the fundamental solution for problems with delta-function inflow boundary conditions, and the observed errors primarily originate from the numerical integration method rather than the neural network's approximation of the solution. Consequently, accuracy can be improved in the future by adopting more advanced numerical integration methods in place of the current midpoint approach. We plan to explore this further.
+
+DeepRTE's ability to maintain good accuracy across different mesh resolutions suggests that the network is learning the basic physical principles of the radiative transport equation, not just fitting to a specific grid setup. This mesh independence has several important benefits:
+\begin{enumerate}
+	\item Computational efficiency: Users can train the model on
+	      fine meshes for high accuracy, but use it on coarser
+	      meshes for faster calculations when lower accuracy is acceptable.
+	\item Flexibility: The same trained model can be used for
+	      problems with different mesh needs without retraining.
+\end{enumerate}

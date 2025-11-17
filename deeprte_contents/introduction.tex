@@ -1,0 +1,107 @@
+\section{Introduction}\label{sec:intro}
+
+The radiative transport equation (RTE) is a
+fundamental equation in a wide variety of applications including
+neutron transport~\cite{case1967linear,lewis1993computational},
+atmospheric radiative transfer~\cite{marshak20063d}, heat
+transfer~\cite{koch2004evaluation}, and optical
+imaging~\cite{klose2002optical,tarvainen2005hybrid,joshi2008radiative}.
+It describes the physical phenomena
+that particles transport and interact with the background media
+through absorption, emission, and scattering processes.
+
+The steady-state RTE without source term writes
+\begin{equation}\label{eq:rte}
+	\bOmega \cdot \nabla I(\br, \bOmega) + \mut(\br) I(\br, \bOmega) =
+	\frac{\mus(\br)}{{S_{d-1}}}\int_{{\sS^{d-1}}}   p(\bOmega, \bOmega^*)
+	I(\br, \bOmega^*) \diff{\bOmega^*},
+\end{equation}
+where $I$ is the radiation intensity that depends on both the position
+variable $\br\in D\subset\R^{d}$, angular variable
+$\bOmega\in\sS^{d-1}$ with $\sS^{d-1}$ being a $d$-dimensional unit sphere;  $S_{d-1} = \dfrac{2\pi^{d/2}}{\Gamma(\frac{d}{2})}$ is the surface area of the unit sphere;
+$\mut$ and $\mus$ are the total and scattering cross section
+coefficients respectively; $p(\bOmega,\bOmega^*)$ is the phase function (or scattering function) that describes the probability of the particles moving with velocity $\bOmega^*$ scattered to velocity $\bOmega$.
+
+The RTE is a high-dimensional differential-integral equation whose analytical solution is not available. As a result, many researchers have focused on developing numerical solutions to the RTE. In most physical applications, the spatial dimension is $3$ and the angular dimension is $2$ corresponding to $d=3$. Solving the RTE under these conditions is computationally expensive and is considered as one of the core tasks in high-performance computing.
+
+Numerical methods for solving the RTE can be broadly classified into two categories:
+1) Deterministic methods: These are based on PDE solvers and they typically involve discretizing Eq. \eqref{eq:rte} in both spatial and angular variables. Popular spatial discretization methods include: the diamond difference method (DD) ~\cite{lathrop1969spatial}, the upwind
+scheme~\cite{klose2002optical}, and other finite difference schemes
+(FD, TPFM)~\cite{han2014two}, finite element methods
+(FEM)~\cite{martin1981phase,tarvainen2005coupled}, finite volume
+methods (FVM)\cite{ren2004algorithm}, the Discontinuous Galerkin
+methods
+(DG)~\cite{cockburn2003discontinuous,wareing2001discontinuous,morel2005sn}.
+The DD and FD methods are well-suited for structured grids, while FEM, FVM, and DG can be applied to unstructured grids.
+For angular discretization, several methods are commonly used, including: the $P_n$
+method~\cite{case1967linear}, the
+FEM~\cite{martin1981phase,tarvainen2005coupled}, the discrete
+ordinate method
+(DOM)~\cite{lewis1993computational,koch2004evaluation,klose2002optical}, etc..
+2) Monte Carlo methods: Monte Carlo methods are widely used due to their ability to handle complex geometries and their suitability for parallel computing \cite{lux2018monte}. However, these methods produce results with statistical noise that decreases slowly with the number of sampled particles, following the $1/\sqrt{N}$ rule \cite{spanier2008monte}. A very large number of samples is needed to obtain accurate results, highlighting a key trade-off between the method's flexibility and its computational cost.
+
+%and many of them use orthogonal bases to expand the integral term in RTE and represent it by summation in orthogonal bases, such as the Legendre polynomials, the spherical harmonics, or the wavelets. However, these orthogonal base expansion methods are not local in angular space and may not be efficient to capture strong localized scattering between the radiances from neighboring angles such as in the presence of strong forward-peaking scattering. Moreover, general boundary conditions on influx and outflux can also be difficult to cope with.
+
+%Among all the numerical schemes on structured grids, the DOM, when combined with FD or the diamond scheme, which is then solved by source-iteration (SI)~\cite{lewis1993computational}, is thes most popular because of its simplicity. However, there are two major issues:
+%\begin{enumerate}
+%  \item The conventional DOM presents difficulty dealing with strong,
+%    forward-peaking scattering as mentioned previously.
+%  \item The SI converges slowly in the scattering-dominating
+%    opticalthick regime. Acceleration techniques, such as diffusion
+%    synthetic acceleration and spatial multigrid (Adams and Larsen,
+%    2002), may be used to accelerate iterative convergence.
+%\end{enumerate}
+
+%The mathematical theory about the RTE~\eqref{eq:rte} is quite clear~\cite{case1967linear,lewis1993computational}. The solution has both maximum principle and energy estimate due to nice properties of the transport operator and the integral operator. However, numerical computation is the only way to give accurate quantitative information of the solution in practice since there is no hope of analytical solution in general.
+To effectively solve the steady-state RTE \eqref{eq:rte}, both deterministic and Monte Carlo methods face their own unique challenges.
+For deterministic methods, the scattering term (integral term) couples the density fluxes of different angles together. This coupling means that after discretization, one must solve a large and not overly sparse linear system (due to the integral term). For this large linear system, an iterative method is usually the only feasible approach. Therefore, developing a faster iterative strategy is of crucial importance.
+For the Monte Carlo method, one of the main challenges is the statistical noise inherent in the method. It can be computationally expensive due to the need for a large number of samples to achieve accurate results.
+Moreover, multiscale phenomena are important in some applications. When the computational domain is large compared to the mean free path ($1/\mut$), the RTE can exhibit quite different behaviors in different regions. For example, it may be more transport-like near the source and more diffusion-like after a significant number of scatterings. The multiscale parameters can affect the performance of iterative methods and accuracy of the Monte Carlo methods.
+%More important, these regions of different behaviors can not be clearly defined as a priori knowledge. This poses a major difficulty for designing a fast iterative solver in the whole domain.
+%For example, diffusion synthetic acceleration method, which is based on diffusion approximation of RTE, may not be effective in transport region, especially when the scattering is very anisotropic such as in forward-peaking case in optical imaging.
+
+With the rapid development of machine learning, particularly deep learning, many researchers have been exploring the use of neural networks to solve PDEs. Two of the most well-known approaches are: 1) Physics-Informed Neural Networks (PINNs)~\cite{raissi2017physics, wang2021understanding}: These networks focus on incorporating physical constraints into the training process, specifically through the design of the loss function. PINNs are often used to approximate the solutions of PDEs by ensuring that the neural network output satisfies the underlying physical laws; 2) Neural Operators: These methods, such as DeepONet~\cite{lu2021learning,jin2022mionet,wang2021learning,lu2022multifidelity,zhu2023reliable} and Fourier Neural Operator (FNO)~\cite{li2020fourier,wen2022u,guibas2021adaptive}, aim to approximate the solution operator of PDEs. More precisely, they map initial conditions, boundary conditions, or coefficient functions directly to the solution of the PDE. Both approaches have their own strengths and limitations and they can be combined to outperform conventional numerical methods. These methods have been successfully applied to solve a variety of PDEs, including the Poisson equation, reaction-diffusion equations, Burgers' equation, and the Navier-Stokes equations. However, the application of neural networks to solve the RTE remains relatively underexplored.
+In parallel, neural network methods have shown promising results for solving inverse problems in radiative transfer, particularly for two-dimensional optical tomography applications~\cite{fan2019solving}.
+
+%In this work, we focus on the neural operator approach to solve the RTE, as operator learning methods like DeepONet and Fourier Neural Operator (FNO) have demonstrated significant efficiency improvements over traditional numerical methods for \textcolor{red}{solving complex PDEs.what kind of PDEs, add citations, briefly talk about their main idea and limitation.}These frameworks aim to approximate the solution operator, mapping input functions to output functions, thereby addressing a wide range of PDE problems more efficiently than conventional numerical methods.
+
+%DeepONet, introduced by Lu et al.~\cite{lu2021learning,jin2022mionet,wang2021learning,lu2022multifidelity,zhu2023reliable}, leverages neural networks to learn the mapping between function spaces directly. Its architecture, comprising branch and trunk networks, allows it to handle high-dimensional inputs effectively. However, a notable limitation of DeepONet is its dependence on grid structures, which can restrict its flexibility in handling irregular domains and varying resolutions. Furthermore, despite its robustness in many applications, DeepONet may struggle with generalization when applied to entirely new problem settings without retraining.
+
+%In contrast, the Fourier Neural Operator (FNO)~\cite{li2020fourier,wen2022u,guibas2021adaptive} utilizes the Fourier transform to operate in the frequency domain, enabling it to capture global patterns in the data. This approach can be particularly advantageous for PDEs with periodic boundary conditions or where spectral methods are traditionally effective. However, the application of FNO to radiative transfer equations (RTE) presents unique challenges. The significance of Fourier transforms in the context of the phase space of RTEs remains unclear, complicating the direct application of FNO to these problems. Additionally, FNO's performance can be hindered by non-periodic boundary conditions due to the global nature of Fourier transforms.
+
+%These challenges underscore the necessity for a novel operator learning approach specifically designed for the unique characteristics of RTEs.
+In this work, we focus on the neural operator approach to solve the RTE. The classical operator learning approaches DeepONet and FNO have shown success in various operator learning tasks, but they face fundamental limitations when directly applied to the RTE. DeepONet relies on predefined grid structures and its branch-trunk architecture struggles to capture the complex, high-frequency features characteristic of radiative transfer solutions.
+Fourier Neural Operators face a couple of key challenges: First, calculating Fourier transforms can be computationally expensive, particularly when dealing with complex, high-dimensional data. Second, FNO struggles when the input parameters and the output solutions reside in different types of spaces. This is because it's difficult to define a meaningful Fourier transform between such distinct domains. These architectural constraints limit both methods' ability to learn the underlying solution operator for radiative transfer problems.
+
+To overcome above challenges, we introduce DeepRTE, an innovative framework that integrates a pre-trained, attention-based neural network while inherently respecting the physical principles governing the transport process.
+DeepRTE is an operator learning approach that maps boundary conditions, cross section ($\mu_s, \mu_t$) and the scattering kernel $p(\bOmega,\bOmega^*)$ directly to the solution. This end-to-end design allows for efficient inference and robust generalization across different problem settings.
+DeepRTE offers several key advantages:
+\begin{enumerate}
+	\item \emph{Fewer Parameters, Greater Precision}: DeepRTE demonstrates that smaller, physics-informed models can outperform larger, purely data-driven frameworks such as multiple-input operators (MIO)~\cite{jin2022mionet}, achieving robust generalization and accuracy with significantly fewer parameters. By embedding the physical principles of RTE, DeepRTE reduces computational complexity while enhancing robustness and interpretability. This approach proves that efficient models, when guided by domain knowledge, can deliver superior results in scientific computing.
+	\item \emph{Zero-Shot Learning Capability}: DeepRTE exhibits
+	      exceptional zero-shot learning ability, allowing it to
+	      generalize effectively to new boundary conditions and configurations
+	      without the need for additional retraining.
+	      This capability is particularly useful for real-world applications
+	      where previously unseen conditions can be commonly encountered.
+	\item \emph{Physical Interpretability}: DeepRTE integrates mathematical semi-analytical formulations and physical insights through attenuation and scattering modules, utilizing the Green's function integral to ensure that the learned operator remains linear and physically interpretable. This alignment with physical principles enhances the model's reliability and applicability across various scenarios.
+\end{enumerate}
+
+% The classical operator learning approaches DeepONet and FNO have shown success in various operator learning tasks, but they face fundamental limitations when directly applied to the RTE. DeepONet relies on predefined grid structures and its branch-trunk architecture struggles to capture the complex, high-frequency features characteristic of radiative transfer solutions.
+% Fourier Neural Operators face a couple of key challenges: First, calculating Fourier transforms can be computationally expensive, particularly when dealing with complex, high-dimensional data. Second, FNOs struggle when the input parameters and the output solutions reside in different types of spaces. This is because it's difficult to define a meaningful Fourier transform between such distinct domains. These architectural constraints limit both methods' ability to learn the underlying solution operator for radiative transfer problems.
+% DeepONet, introduced by Lu et al. , leverages neural networks to learn the mapping between function spaces directly. Its architecture, comprising branch and trunk networks, allows it to handle high-dimensional inputs effectively. For example, in solving the Navier-Stokes equations, DeepONet can map the initial velocity field and boundary conditions directly to the solution field. However, despite its robustness in many applications, notable limitations of DeepONet are its dependence on grid structures and difficulty of generalization when applied to entirely new problem settings without retraining. On the other hand, FNO utilizes the Fourier transform to operate in the frequency domain, enabling it to capture global patterns in the data. This approach can be particularly effective for PDEs with periodic boundary conditions or where spectral methods are traditionally effective. However, FNO's performance can be significantly degraded for non-periodic boundary conditions due to the global nature of Fourier transforms.
+
+%The DeepRTE model enhances the accuracy of a set of radiative transport problems with boundary conditions. It demonstrates excellent generalization and transferability even under small parameter quantities. These advantages stem from the construction of an operator learning network structure that conforms to mathematical priors.
+
+The paper is organized as follows.
+In Section~\ref{sec:preliminaries}, we provide a brief overview of the semi-analytical form of RTE solution operator.
+In Section~\ref{sec:architecture} and Section~\ref{sec:training}, we present the DeepRTE framework, detailing the architecture, training process, and key components.
+In Section~\ref{sec:experiments}, we evaluate the performance of DeepRTE on a series of RTE problems, comparing it with traditional numerical methods and other operator learning frameworks.
+In Section~\ref{sec:ablation-study}, we investigate our architecture design choices through ablation studies and compare with baseline model. Finally, we conclude with a summary of our findings and discuss potential future research directions.
+
+\paragraph{Code and data availability}
+All code for this work is openly available on GitHub under the repositories \href{https://github.com/mazhengcn/deeprte}{deeprte}\footnote{\url{https://github.com/mazhengcn/deeprte}} and \href{https://github.com/mazhengcn/rte-dataset}{rte-dataset}\footnote{ \url{https://github.com/mazhengcn/rte-dataset}} under an open-source license.
+The codebase includes the implementation of DeepRTE models, configuration files, and utilities for dataset generation, model training, evaluation and experimentations.
+Additionally, we utilized widely adopted open-source libraries, including JAX~\cite{jax2018github}, Flax~\cite{flax2020github}, Optax~\cite{deepmind2020jax}, TensorFlow Datasets and so on.
+Pre-trained models and datasets are also accessible on Hugging Face via \href{https://huggingface.co/mazhengcn/deeprte}{mazhengcn/deeprte}\footnote{\url{https://huggingface.co/mazhengcn/deeprte}} and \href{https://huggingface.co/datasets/mazhengcn/rte-dataset}{mazhengcn/rte-dataset}\footnote{\url{https://huggingface.co/datasets/mazhengcn/rte-dataset}}.
+All algorithms, models, and results reported in this paper can be fully reproduced using the provided repositories and resources.
