@@ -1,0 +1,800 @@
+\chapter{基础知识}
+
+\section{输运问题的数学建模}
+
+\subsection{辐射输运方程}
+
+\todo[inline]{此处补充输运问题的数学建模背景介绍，包括相空间、分布函数、输运方程的基本形式等内容，为后续章节做铺垫。}
+
+\todo[inline]{介绍各向同性和各向异性问题的区别}
+
+辐射输运方程（Radiative Transport Equation, RTE）广泛应用于中子输运、大气辐射传输及光学成像等领域，描述了粒子在介质中输运并发生吸收、发射和散射的物理过程。
+
+设 $D \subset \mathbb{R}^d$ 为空间区域，$\sS^{d-1}$ 为速度方向的单位球面。考虑如下带有入流边界条件的稳态辐射输运方程：
+\begin{equation}\label{eq:rte}
+    \begin{aligned}
+        \bOmega \cdot \nabla I(\br, \bOmega) + \mut(\br) I(\br, \bOmega) & = \frac{\mus(\br)}{S_{d-1}}\int_{\sS^{d-1}} p(\bOmega, \bOmega^*) I(\br, \bOmega^*) \diff{\bOmega^*}, &  & \text{in } D \times \sS^{d-1}, \\
+        I(\br, \bOmega)                                                  & = I_{-}(\br, \bOmega),                                                                                &  & \text{on } \Gamma_{-}.
+    \end{aligned}
+\end{equation}
+其中 $I(\br, \bOmega)$ 表示辐射强度，依赖于空间位置 $\br$ 和角度 $\bOmega$。$S_{d-1} = \frac{2\pi^{d/2}}{\Gamma(d/2)}$ 为单位球面表面积。边界集合定义为 $\Gamma_{\pm} := \{(\br,\bOmega) \in \partial D \times \sS^{d-1} \mid \mp\bn(\br)\cdot\bOmega<0 \}$，其中 $\bn(\br)$ 为边界外法线方向，$\Gamma_{-}$ 即为入流边界，$I_{-}$ 为给定的入流函数。
+
+方程系数 $\mut$ 和 $\mus$ 分别表示总截面和散射截面，差值 $\mu_a = \mut - \mus$ 为吸收截面。散射核 $p(\bOmega, \bOmega^*)$ 描述粒子从方向 $\bOmega^*$ 散射到 $\bOmega$ 的概率密度，通常满足归一化条件 $\frac{1}{S_{d-1}}\int_{\sS^{d-1}} p(\bOmega,\bOmega^*) \diff{\bOmega^*} = 1$ 及互易性 $p(\bOmega,\bOmega^*) = p(\bOmega^*,\bOmega)$。在许多应用中，散射核还具有旋转不变性，即仅依赖于散射角 $\bOmega \cdot \bOmega^*$。
+
+由于 RTE 是定义在高维相空间上的微分-积分方程（例如 $d=3$ 时为 5 维），数值求解计算代价高昂，是高性能计算领域的重要挑战之一。
+
+为了数值求解辐射输运方程，通常需要对角度变量和空间变量进行离散。
+
+在实际应用中，RTE~\eqref{eq:rte} 是关于位置变量 $\br\in\mathbb{R}^3$ 和角度变量 $\bOmega\in\sS^2$ 的 6 维方程（对应 $d=3$）。
+它可以被简化为低维方程。
+在笛卡尔坐标系中，令
+\begin{equation}
+    \bOmega=(c,s,\zeta), \quad c =
+        {\left(1-\zeta^{2}\right)}^{\frac{1}{2}} \cos\theta, \quad s =
+        {\left(1-\zeta^{2}\right)}^{\frac{1}{2}} \sin\theta, \quad \text{for }|\zeta| \leq 1.
+\end{equation}
+假设 $\mut, \mus$ 仅依赖于 $x, y$，且 $I$ 沿 $z$ 轴均匀分布。函数
+\begin{equation}
+    \tilde{I}(x, y,\zeta,\theta) = \frac{1}{2}[I(x,y,z,c,s,\zeta) + I(x,y,z,c,s,-\zeta)],
+\end{equation}
+和
+\begin{equation}
+    \tilde{p}(\zeta,\theta,\zeta^*, \theta^*) = \frac{1}{2}[p(c,s,\zeta, c^*,s^*,\zeta^*) + p(c,s,\zeta, c^*,s^*,-\zeta^*)],
+\end{equation}
+与 $z$ 无关且关于 $\zeta$ 是偶函数。因此，方程~\eqref{eq:rte} 简化为如下方程：
+\begin{equation}
+    \begin{split}
+         & \left(c\partial_x \tilde{I}(x,y,\zeta,\theta)+s\partial_y \tilde{I}(x,y,\zeta,\theta)\right)+\mut \tilde{I}(x,y,\zeta,\theta)                                 \\
+         & \qquad =\frac{\mus}{2\pi}\int_{0}^{1} \int_0^{2\pi} \tilde{p}(\zeta, \theta, \zeta^*,\theta^*) \tilde{I}(x,y,\zeta^*,\theta^*) \diff{\theta^*}\diff{\zeta^*},
+    \end{split}
+\end{equation}
+带有入射边界条件：
+\begin{equation}
+    \tilde{I}(x,y,\bOmega)=\tilde{I}_{-}(x,y,\bOmega), \quad \text{for }
+    \bOmega\cdot\bm{n}<0,\quad (x, y)\in\partial D.
+\end{equation}
+
+\subsection{各向同性与各向异性}
+
+辐射输运问题依据散射过程的方向特性，可划分为各向同性（Isotropic）散射与各向异性（Anisotropic）散射。各向同性散射意味着粒子在发生碰撞后，散射到所有方向的概率是均等的，此时散射核 $p(\bOmega, \bOmega^*)$ 为常数。而在实际物理过程中（如大气辐射、生物组织光学等），散射往往表现出显著的方向性，即各向异性。此时，散射概率密度主要取决于入射方向 $\bOmega^*$ 与出射方向 $\bOmega$ 之间的夹角（散射角）。相函数（Phase Function）正是用于定量描述这种散射角分布特性的数学函数。
+
+对于各向异性散射，一个广泛使用的参数化模型是 Henyey-Greenstein (H-G) 相函数，其形式为：
+\begin{equation}
+    p(\bOmega,\bOmega^*) = p(\bOmega\cdot\bOmega^*) = \frac{1-g^2}{{\Bigl(1+g^2-2g\,(cc^*+ss^*+\zeta\zeta^*)\Bigr)}^{\frac{3}{2}}}.
+\end{equation}
+其中，非对称因子 $g \in [-1, 1]$ 是连接各向同性与各向异性的关键参数：当 $g=0$ 时，相函数退化为常数，对应各向同性散射；当 $g > 0$ 时，表现为前向散射（Forward Scattering）；当 $g < 0$ 时，则为后向散射（Backward Scattering）。$g$ 越接近 1，前向散射峰越尖锐。尽管本文主要以 H-G 相函数为例进行讨论，但所提出的数值方法具有通用性，可直接适配 Mie 散射等其他复杂的相函数模型。
+
+\subsection{角度离散}
+对于角度变量 $\bOmega$，最常用的离散方法是离散纵标法（Discrete Ordinates Method, $S_N$）。该方法选取一组离散的方向 $\{\bOmega_n\}_{n=1}^N$ 和对应的求积权重 $\{w_n\}_{n=1}^N$，将积分项近似为求和：
+\begin{equation}
+    \int_{\sS^{d-1}} f(\bOmega) \diff{\bOmega} \approx \sum_{n=1}^N w_n f(\bOmega_n).
+\end{equation}
+由此，连续的输运方程转化为一组耦合的偏微分方程组，每个方程对应一个离散方向 $\bOmega_n$。
+
+针对前文所述的二维降维模型，角度求积点选取为区间 $[-1,1]$ 上 $2N$ 阶标准勒让德多项式的正根。此处我们取 $N=3$，具体的求积点和权重如表~\ref{tab:quadrature} 所示。表中符号 $\zeta_i, \theta_i, c_i, s_i$ 均沿用模型降维一节中的定义，分别对应速度空间坐标及其三角函数值，$w_i$ 为对应的求积权重。
+
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{ccccc}
+        \toprule
+        $\zeta_i$ & $\theta_i$ & $c_i$     & $s_i$     & $4 w_i$   \\
+        \midrule
+        0.2386192 & $\pi$/12   & 0.9380233 & 0.2513426 & 0.1559713 \\
+        0.2386192 & 3$\pi$/12  & 0.6866807 & 0.6866807 & 0.1559713 \\
+        0.2386192 & 5$\pi$/12  & 0.2513426 & 0.9380233 & 0.1559713 \\
+        0.6612094 & $\pi$/8    & 0.6930957 & 0.2870896 & 0.1803808 \\
+        0.6612094 & 3$\pi$/8   & 0.2870896 & 0.6930957 & 0.1803808 \\
+        0.9324695 & $\pi$/4    & 0.2554414 & 0.2554414 & 0.1713245 \\
+        \bottomrule
+    \end{tabular}
+    \caption{求积组的角度求积点和权重。$\zeta_i$ 和 $\theta_i$ 是速度空间的求积点，$c_i$ 和 $s_i$ 是对应的余弦和正弦值，$w_i$ 是求积权重。}\label{tab:quadrature}
+\end{table}
+
+\subsection{空间离散}
+空间离散通常基于有限体积法（Finite Volume Method, FVM），以确保物理量的守恒性。该方法将空间区域划分为一系列网格单元，并在每个单元 $V_j$ 上对输运方程进行积分。利用高斯散度定理将流项转化为边界积分，从而建立单元平均辐射强度与边界辐射强度之间的平衡方程。
+\todo[inline]{增加图片}
+
+在正交网格系统中，考虑沿某一坐标轴方向的输运过程。设该方向上的网格步长为 $h_j$，方向余弦为 $\xi_n$，则离散后的粒子平衡方程可表示为：
+\begin{equation}\label{eq:balance}
+    \frac{\xi_n}{h_j} (I_{n, j+1/2} - I_{n, j-1/2}) + \mu_{t,j} I_{n,j} = S_{n,j}, \quad 1 \le n \le N, \quad 1 \le j \le J.
+\end{equation}
+其中，$I_{n,j}$ 表示单元内的平均辐射强度，$I_{n, j \pm 1/2}$ 分别表示该坐标方向上单元出射和入射边界处的辐射强度。$S_{n,j}$ 为包含散射贡献的源项：
+\begin{equation}
+    S_{n,j} = \frac{\mu_{s,j}}{2} \sum_{m=1}^N w_m I_{m,j}.
+\end{equation}
+上述平衡方程中包含单元平均值和边界值，未知数个数多于方程个数，因此需要引入辅助方程来封闭方程组。菱形差分（Diamond Difference, DD）格式是最经典的辅助关系之一，它假设单元中心的辐射强度等于相对边界上辐射强度的算术平均值：
+\begin{equation}\label{eq:dd}
+    I_{n,j} = \frac{1}{2} (I_{n, j+1/2} + I_{n, j-1/2}).
+\end{equation}
+联立平衡方程 \eqref{eq:balance} 与辅助方程 \eqref{eq:dd}，即可在给定入流边界条件的前提下，沿输运方向逐个网格推进求解辐射强度分布。
+
+
+\section{传统数值方法}
+
+针对辐射输运方程的数值求解，本文根据散射特性的不同，即各向同性与各向异性采用了两种针对性的数值策略。
+
+对于各向同性散射问题，由于散射核退化为常数，角度间的耦合相对简单。因此采用基于基函数展开的定制有限点格式（Tailored Finite Point Schemes, TFPS）。该方法通过在网格单元内构造满足局部输运方程的解析基函数，能够以较少的自由度获得较高的数值精度，特别适用于处理具有不同平均自由程的介质。
+
+对于各向异性散射问题，散射核的复杂性导致了所有角度方向的辐射强度紧密耦合，直接构建和求解大规模代数方程组在计算上极其昂贵。因此，我们采用源迭代（Source Iteration, SI）方法。该方法通过迭代更新散射源项，将复杂的积分-微分方程解耦为一系列独立的单向输运问题，并结合离散纵标法（$S_N$）和菱形差分（DD）格式进行高效求解。
+
+下文将分别详细介绍这两种方法。
+
+\subsection{各向同性情形：TFPS方法}
+
+本节介绍用于求解各向同性散射问题的四点单元中心定制有限点格式（TFPS）。在此情形下，假设相函数为常数，输运方程的散射项简化为标量通量的函数。
+\todo[inline]{增加引用}
+\todo[inline]{检查是不是还有符号错误}
+\todo[inline]{图片}
+令 $\mathbf{x}_{i+1/2}=\mathbf{x}_{i}+h_{1}/2$ 和 $y_{j+1/2}=y_{j}+h_{2}/2$，其中 $i=0,1,\cdots,I-1$，$j=0,1,\cdots,J-1$。定义以 $\mathbf{z}_{i+1/2,j+1/2}=(x_{i+1/2},y_{j+1/2})$ 为中心的网格单元为
+\[
+    T_{i+1/2,j+1/2}=\{(x,y)\,|\,|x-x_{i+1/2}|\leq h_{1}/2,|y-y_{j+1/2}|\leq h_{2}/2\}.
+\]
+记四个边的中心分别为 $\mathbf{z}_{i+1,j+1/2}$，$\mathbf{z}_{i+1/2,j+1}$，$\mathbf{z}_{i,j+1/2}$ 和 $\mathbf{z}_{i+1/2,j}$。
+
+假设在单元 $T_{i+1/2,j+1/2}$ 上，离散纵标方程由如下常系数一阶偏微分方程近似：
+\begin{equation}
+    \epsilon\left(c_{m}\frac{\partial}{\partial x}\tilde{I}_{m}+s_{m}\frac{\partial}{\partial y}\tilde{I}_{m}\right)+\mu_{t}\tilde{I}_{m}=\epsilon^{2}q+\left(\mu_{t}-\epsilon^{2}\mu_{a}\right)\sum_{n=1}^N w_{n}\tilde{I}_{n},\quad m=1,\dots,N.
+\end{equation}
+令 $\mathbf{I}^{(0)}=(I^{(0)}_{1},\cdots,I^{(0)}_{N})^{\mathrm{T}}=\frac{q}{\mu_{a}}(1,1,\cdots,1)^{\mathrm{T}}\in\mathbb{R}^{N}$。易证 $\mathbf{I}^{(0)}$ 是上述方程的一个特解，且差值 $\mathbf{I}(\mathbf{z})=\tilde{\mathbf{I}}(\mathbf{z})-\mathbf{I}^{(0)}$ 满足齐次方程：
+\begin{equation}
+    \epsilon\left(c_{m}\frac{\partial}{\partial x}I_{m}+s_{m}\frac{\partial}{\partial y}I_{m}\right)+\mu_{t}I_{m}=\left(\mu_{t}-\epsilon^{2}\mu_{a}\right)\sum_{n=1}^N w_{n}I_{n},\quad m=1,\dots,N.
+\end{equation}
+
+类似于五点节点中心格式的构造，令 $K$ 为正整数，考虑齐次方程的 $K$ 个线性无关解：
+\begin{equation}
+    \mathbf{I}^{(k)}(\mathbf{z})=\boldsymbol{\xi}^{(k)}\exp\left\{\frac{\lambda_{k}(x-x_{i+1/2})+\nu_{k}(y-y_{j+1/2})-\max\{\frac{1}{2}h_{1}|\lambda_{k}|,\frac{1}{2}h_{2}|\nu_{k}|\}}{\epsilon}\right\},
+\end{equation}
+其中 $k=1,2,\cdots,K$。这里 $(\lambda_{k},\nu_{k})$ 是特征值对，$\boldsymbol{\xi}^{(k)}$ 是对应的特征向量。
+
+令 $\{\alpha_{k},k=1,2,\cdots,K\}$ 为常数，显然向量值函数
+\begin{equation}
+    \tilde{\mathbf{I}}(\mathbf{z})=\mathbf{I}^{(0)}+\sum_{k=1}^{K}\alpha_{k}\mathbf{I}^{(k)}(\mathbf{z})
+\end{equation}
+是非齐次方程组的解。
+
+对于每个网格单元 $T_{i+1/2,j+1/2}$，选取单元边界 $\partial T_{i+1/2,j+1/2}$ 上的四个边中心
+\[
+    \{\mathbf{z}_{i+1,j+1/2},\mathbf{z}_{i+1/2,j+1},\mathbf{z}_{i,j+1/2},\mathbf{z}_{i+1/2,j}\}
+\]
+来构造离散格式。
+
+离散入流边界条件由四个边中心处的 $K$ 个值给出（此处 $K$ 取决于角度离散的具体数目）：
+\[
+    \left\{\begin{array}{lll}
+        \tilde{I}_{m}(\mathbf{z}_{i+1,j+1/2}), & \mbox{with} & c_{m}<0, \\
+        \tilde{I}_{m}(\mathbf{z}_{i+1/2,j+1}), & \mbox{with} & s_{m}<0, \\
+        \tilde{I}_{m}(\mathbf{z}_{i,j+1/2}),   & \mbox{with} & c_{m}>0, \\
+        \tilde{I}_{m}(\mathbf{z}_{i+1/2,j}),   & \mbox{with} & s_{m}>0,
+    \end{array}\right.
+\]
+对于 $m=1,\dots,N$。系数 $\{\alpha_{k}\}$ 可由单元边的未知量确定：
+\[
+    \left\{\begin{array}{lll}
+        I^{(0)}_{m}+\sum\limits_{k=1}^{K}\alpha_{k}I^{(k)}_{m}(\mathbf{z}_{i+1,j+1/2})=\tilde{I}_{m}(\mathbf{z}_{i+1,j+1/2}), & \mbox{with} & c_{m}<0, \\
+        I^{(0)}_{m}+\sum\limits_{k=1}^{K}\alpha_{k}I^{(k)}_{m}(\mathbf{z}_{i+1/2,j+1})=\tilde{I}_{m}(\mathbf{z}_{i+1/2,j+1}), & \mbox{with} & s_{m}<0, \\
+        I^{(0)}_{m}+\sum\limits_{k=1}^{K}\alpha_{k}I^{(k)}_{m}(\mathbf{z}_{i,j+1/2})=\tilde{I}_{m}(\mathbf{z}_{i,j+1/2}),     & \mbox{with} & c_{m}>0, \\
+        I^{(0)}_{m}+\sum\limits_{k=1}^{K}\alpha_{k}I^{(k)}_{m}(\mathbf{z}_{i+1/2,j})=\tilde{I}_{m}(\mathbf{z}_{i+1/2,j}).     & \mbox{with} & s_{m}>0.
+    \end{array}\right.
+\]
+这提供了一个线性代数方程组。为了确定系数 $\{\alpha_{k}\}_{k=1}^{K}$，我们选取适当的 $K$ 值（通常等于边界条件方程的总数）。
+
+通过求解上述方程组，将常数 $\{\alpha_{k}\}$ 表示为边中心未知量的函数，并代入出流边界条件表达式：
+\[
+    \left\{\begin{array}{lll}
+        I^{(0)}_{m}+\sum\limits_{k=1}^{K}\alpha_{k}I^{(k)}_{m}(\mathbf{z}_{i+1,j+1/2})=\tilde{I}_{m}(\mathbf{z}_{i+1,j+1/2}), & c_{m}>0, \\
+        I^{(0)}_{m}+\sum\limits_{k=1}^{K}\alpha_{k}I^{(k)}_{m}(\mathbf{z}_{i+1/2,j+1})=\tilde{I}_{m}(\mathbf{z}_{i+1/2,j+1}), & s_{m}>0, \\
+        I^{(0)}_{m}+\sum\limits_{k=1}^{K}\alpha_{k}I^{(k)}_{m}(\mathbf{z}_{i,j+1/2})=\tilde{I}_{m}(\mathbf{z}_{i,j+1/2}),     & c_{m}<0, \\
+        I^{(0)}_{m}+\sum\limits_{k=1}^{K}\alpha_{k}I^{(k)}_{m}(\mathbf{z}_{i+1/2,j})=\tilde{I}_{m}(\mathbf{z}_{i+1/2,j}),     & s_{m}<0.
+    \end{array}\right.
+\]
+即可得到连接单元四个边中心未知量的有限差分格式。
+
+\subsection{各向异性情形：源迭代方法}
+
+当考虑各向异性散射时，散射源项不仅依赖于标量通量，还依赖于角通量的高阶矩，导致角度耦合显著增强。为了解决这一困难，源迭代（Source Iteration, SI）成为一种标准的解法。SI 的核心思想是利用上一次迭代的辐射强度来计算散射项，将其视为固定的“源”，从而将复杂的积分-微分方程转化为一系列独立的微分方程求解。其连续形式的迭代格式如下：
+\begin{equation}
+    \left\{
+    \begin{aligned}
+         & \bOmega \cdot \nabla I^{(\ell+1)}(\br, \bOmega) + \mut(\br) I^{(\ell+1)}(\br, \bOmega) = \frac{\mus(\br)}{S_{d-1}} \int_{\sS^{d-1}} p(\bOmega, \bOmega^*) I^{(\ell)}(\br, \bOmega^*) \diff{\bOmega^*}, &  & \text{in } D \times \sS^{d-1}, \\
+         & I^{(\ell+1)}(\br, \bOmega) = I_{-}(\br, \bOmega),                                                                                                                                                      &  & \text{on } \Gamma_{-}.
+    \end{aligned}
+    \right.
+\end{equation}
+其中 $I^{(0)}$ 为初始猜测值。在第 $\ell$ 次迭代中，方程右端项已知，左端项仅涉及当前方向的导数和反应率，因此可以沿特征线方向直接积分求解。
+
+结合前述的 $S_N$ 角度离散和菱形差分空间离散，源迭代的具体算法流程（即传输扫描，Transport Sweep）如下：
+\begin{enumerate}
+    \item \textbf{更新源项}：利用第 $\ell$ 步迭代得到的标量通量（或角通量矩）计算各网格内的散射源 $S_{n,j}^{(\ell)}$。
+    \item \textbf{传输扫描}：对每个离散方向 $\xi_n$，根据粒子飞行方向逆流求解：
+          \begin{itemize}
+              \item 若 $\xi_n > 0$（粒子向右运动），则从左边界 $j=1$ 扫描至 $j=J$。利用左侧入流边界条件 $I_{n, 1/2}$，结合平衡方程和辅助方程，依次解出单元平均值 $I_{n,j}$ 和右侧出流边界值 $I_{n, j+1/2}$：
+                    \begin{equation}
+                        I_{n,j}^{(\ell+1)} = \frac{\frac{2\xi_n}{h_j} I_{n, j-1/2}^{(\ell+1)} + S_{n,j}^{(\ell)}}{\frac{2\xi_n}{h_j} + \mu_{t,j}}, \quad I_{n, j+1/2}^{(\ell+1)} = 2 I_{n,j}^{(\ell+1)} - I_{n, j-1/2}^{(\ell+1)}.
+                    \end{equation}
+              \item 若 $\xi_n < 0$（粒子向左运动），则从右边界 $j=J$ 扫描至 $j=1$，利用右侧入流边界条件 $I_{n, J+1/2}$ 和类似的递推关系求解。
+          \end{itemize}
+    \item \textbf{收敛判定}：完成所有方向的扫描后，更新标量通量并检查是否满足收敛准则。若未收敛，则进入下一轮迭代。
+\end{enumerate}
+
+从物理角度看，若初始猜测 $I^{(0)}=0$，则第 $\ell$ 次迭代的结果 $I^{(\ell)}$ 包含了经历过 $0$ 到 $\ell-1$ 次散射的粒子贡献。因此，源迭代的收敛速度取决于系统的散射性质：在强吸收或强泄漏系统中（粒子平均碰撞次数少），SI 收敛迅速；而在散射占主导的系统中（粒子经历多次碰撞），SI 收敛速度会显著变慢，效率降低。
+
+
+\section{深度学习基本知识}
+本章节将介绍本文中用到的深度学习基本知识，从神经网络模型出发，介绍损失函数，优化方法，自动微分，常用深度学习模型，并行计算等内容，为后续章节的深度学习方法做铺垫。
+
+\todo[inline]{根据实际情况修改该章节的前置描述部分}
+
+\subsection{神经网络模型简述}
+\todo[inline]{图！图！图！}
+神经网络中最基本的组成单元是人工神经元，其灵感源自生物神经元的工作机理：单个神经元通过突触与其他神经元相连，当其被外界刺激激活时，会向相邻神经元传递信号，从而改变后者的膜电位；当膜电位累积到一定阈值后，下游神经元也会被激活并继续向外输出信号，形成在神经网络中传播的信息流。
+
+1943 年，McCulloch 和 Pitts 提出了第一个数学意义上的神经元模型。在该模型中，一个神经元接收来自 $n$ 个前一层神经元的输入信号，这些信号通过带权重的连接传递到当前神经元，神经元首先对输入进行加权求和，并与预先设定的阈值进行比较，然后将结果送入激活函数以产生最终输出，从而在简化的数学框架下刻画了“兴奋/抑制—阈值判断—输出”的基本过程。
+
+在理想化的模型中，激活函数常被设想为阶跃函数，用于模拟“达到阈值即触发”的开关行为。然而，阶跃函数在数学性质上具有不连续、不光滑等缺点，不利于基于梯度的优化算法，在实际应用中通常被其他平滑或分段线性的激活函数所取代。常用的激活函数包括 Sigmoid 函数、双曲正切（tanh）函数以及线性整流单元（ReLU）等，其典型形式可写为
+\begin{equation}
+    \sigma_{\mathrm{sigmoid}}(x) = \frac{1}{1 + e^{-x}},
+\end{equation}
+\begin{equation}
+    \sigma_{\tanh}(x) = \tanh(x) = \frac{e^{x} - e^{-x}}{e^{x} + e^{-x}},
+\end{equation}
+\begin{equation}
+    \sigma_{\mathrm{ReLU}}(x)
+    = \max\{0, x\}
+    =
+    \begin{cases}
+        0, & x \le 0, \\
+        x, & x > 0.
+    \end{cases}
+\end{equation}
+其中，Sigmoid 和 $\tanh$ 可视为对理想阶跃函数的平滑近似，分别将输入压缩到 $(0,1)$ 和 $(-1,1)$ 区间；而 ReLU 则通过简单的分段线性结构在保持非线性的同时兼顾了计算效率与优化稳定性。
+
+\todo[inline]{插入激活函数函数的图示}
+
+对于一个具体问题，假设其输入输出空间分别为$\mathcal{X}$和$\mathcal{Y}$, 神经网络旨在通过参数化的非线性映射 $f_{\bm{\theta}}: \mathcal{X} \to \mathcal{Y}$ 来近似某个目标函数 $f: \mathcal{X} \to \mathcal{Y}$。这里，$\bm{\theta}$ 表示神经网络中的所有可训练参数（如权重和偏置）。神经网络通常由多层神经元组成，每层神经元通过激活函数引入非线性变换，从而赋予网络强大的表达能力。
+
+一个输入为 $x \in \mathcal{X}$ 的神经网络经过 $L$ 层变换后，其输出 $f_{\bm{\theta}}(x)$ 可表示为
+\begin{equation}
+    \begin{aligned}
+        h^{(0)}            & = x,                                                                             \\
+        h^{(l)}            & = \sigma\left( W^{(l)} h^{(l-1)} + b^{(l)} \right), \quad l = 1, 2, \ldots, L-1, \\
+        f_{\bm{\theta}}(x) & = W^{(L)} h^{(L-1)} + b^{(L)},
+    \end{aligned}
+\end{equation}
+这里我们定义了每一层的输出 $h^{(l)}$，其中 $W^{(l)}$ 和 $b^{(l)}$ 分别表示第 $l$ 层的权重矩阵和偏置向量，$\sigma$ 是激活函数。通过调整参数 $\bm{\theta} = \{ W^{(l)}, b^{(l)} \}_{l=1}^{L}$，神经网络能够学习到输入与输出之间的复杂映射关系。
+
+\subsection{注意力机制简介}
+
+近年来，Transformer 模型已经成为深度学习领域中最具影响力的网络结构之一。自 Vaswani 等人在 2017 年提出 “Attention Is All You Need” 以来，基于 Transformer 的模型在机器翻译、自然语言理解、文本生成等诸多任务上不断刷新性能纪录，并逐步推广到计算机视觉、语音处理以及科学计算等更广泛的领域。Transformer 的核心思想是用基于注意力机制的并行计算模块替代传统循环神经网络中的时间递推结构，从而在捕捉长程依赖的同时显著提升训练和推理效率。
+
+在 Transformer 架构中，最关键的组成部分就是自注意力（self-attention）机制。直观地说，注意力机制通过对一组输入元素进行“加权平均”来得到输出，其中权重并非预先固定，而是根据当前任务需求由网络动态计算，从而实现“在不同上下文中关注不同位置”的效果。相比于卷积和循环网络，自注意力一方面能够在一次计算中同时建模序列中任意两位置之间的依赖关系，另一方面也更易于在 GPU/TPU 上实现高度并行，因此成为 Transformer 及其变体的基础算子。
+
+从数学上看，标准的“加性注意力”或“乘性注意力”都可以抽象为同一类结构：给定一组查询（query）向量 $Q$、键（key）向量 $K$ 和值（value）向量 $V$，注意力机制首先根据查询和键之间的相似度计算注意力权重，然后利用这些权重对值向量进行加权平均。以序列长度为 $n$、隐藏维度为 $d$ 的一组向量为例，记
+\[
+    Q = \begin{bmatrix} q_1^\top \\ \vdots \\ q_n^\top \end{bmatrix} \in \mathbb{R}^{n \times d},\quad
+    K = \begin{bmatrix} k_1^\top \\ \vdots \\ k_n^\top \end{bmatrix} \in \mathbb{R}^{n \times d},\quad
+    V = \begin{bmatrix} v_1^\top \\ \vdots \\ v_n^\top \end{bmatrix} \in \mathbb{R}^{n \times d_v}.
+\]
+最常用的是缩放点积注意力（scaled dot-product attention），其定义为
+\begin{equation}
+    \mathrm{Attention}(Q,K,V)
+    = \mathrm{softmax}\!\left( \frac{QK^\top}{\sqrt{d_k}} \right) V,
+\end{equation}
+其中 $d_k$ 为键向量的维度，$QK^\top \in \mathbb{R}^{n \times n}$ 的第 $(i,j)$ 个元素为 $q_i \cdot k_j$，即第 $i$ 个查询与第 $j$ 个键的点积相似度。对每一行除以 $\sqrt{d_k}$ 是为了在高维情况下控制方差，避免 softmax 在初始化阶段过早饱和。随后对每一行应用 softmax 函数，得到归一化的注意力权重矩阵
+\begin{equation}
+    \alpha_{ij}
+    = \frac{
+        \exp\!\left( \frac{q_i \cdot k_j}{\sqrt{d_k}} \right)
+    }{
+        \sum_{j'=1}^{n} \exp\!\left( \frac{q_i \cdot k_{j'}}{\sqrt{d_k}} \right)
+    },
+    \qquad i,j = 1,\dots,n,
+\end{equation}
+从而输出向量可以写为
+\begin{equation}
+    \mathrm{Attention}(Q,K,V)_i
+    = \sum_{j=1}^{n} \alpha_{ij} \, v_j,
+    \qquad i = 1,\dots,n.
+\end{equation}
+可以看出，每一个位置 $i$ 的输出是对全体值向量 $\{v_j\}$ 的加权平均，权重 $\alpha_{ij}$ 则由查询 $q_i$ 与各键 $k_j$ 的相似度动态决定。
+
+在实际的 Transformer 中，为了让模型在不同“子空间”中并行地学习多种关系模式，通常会采用多头注意力（multi-head attention）结构。设注意力头数为 $H$，输入的查询、键和值分别为
+\[
+    Q \in \mathbb{R}^{n \times d_{\mathrm{model}}},\quad
+    K \in \mathbb{R}^{n \times d_{\mathrm{model}}},\quad
+    V \in \mathbb{R}^{n \times d_{\mathrm{model}}},
+\]
+则第 $h$ 个头首先通过线性变换得到对应的查询、键和值：
+\begin{equation}
+    Q_h = Q W_h^Q,\quad
+    K_h = K W_h^K,\quad
+    V_h = V W_h^V,\qquad h = 1,\dots,H,
+\end{equation}
+其中 $W_h^Q, W_h^K \in \mathbb{R}^{d_{\mathrm{model}} \times d_k}$，$W_h^V \in \mathbb{R}^{d_{\mathrm{model}} \times d_v}$ 为第 $h$ 个头对应的可训练权重矩阵。
+
+对于每个头，其缩放点积注意力定义为
+\begin{equation}
+    \mathrm{head}_h
+    = \mathrm{Attention}(Q_h,K_h,V_h)
+    = \mathrm{softmax}\!\left( \frac{Q_h K_h^\top}{\sqrt{d_k}} + M \right) V_h,
+    \qquad h = 1,\dots,H,
+\end{equation}
+其中 $M \in \mathbb{R}^{n \times n}$ 为可选的掩膜矩阵（例如用于遮蔽填充位置或实现自回归结构）。
+
+然后在特征维度上拼接各个头的输出，并通过线性变换投影回原始维度，得到多头注意力层的整体输出：
+\begin{equation}
+    \mathrm{MultiHead}(Q,K,V)
+    = \mathrm{Concat}\bigl(\mathrm{head}_1, \ldots, \mathrm{head}_H\bigr) W^O,
+\end{equation}
+其中 $W^O \in \mathbb{R}^{H d_v \times d_{\mathrm{model}}}$ 为输出映射矩阵。多头注意力结构使得模型能够在不同子空间中并行建模多种关系模式，例如局部邻域依赖、全局长程依赖以及特定语义结构等，从而显著提升整体表达能力。
+\todo[inline]{加入 Attention 模型的结构图示}
+
+在本文后续的 DeepRTE 框架中，自注意力与多头注意力模块被用于在空间坐标、参数场以及散射核等高维输入之间建立全局的相关性建模，从而在辐射输运算子学习中有效捕捉多尺度耦合结构与长程依赖关系。
+
+\subsection{损失函数}
+
+在监督学习框架下，假设输入输出对 $(x,y)$ 服从某个未知的真实分布 $\mathcal{D}$，我们用一个带参数的神经网络
+\begin{equation}
+    f_{\bm{\theta}} : \mathcal{X} \to \mathcal{Y}, \qquad x \mapsto f_{\bm{\theta}}(x)
+\end{equation}
+来近似真实的目标映射。给定一个点上的预测 $f_{\bm{\theta}}(x)$ 与真实标签 $y$，通过某个点损失函数
+\begin{equation}
+    \ell : \mathcal{Y} \times \mathcal{Y} \to [0,+\infty), \qquad
+    (f_{\bm{\theta}}(x), y) \mapsto \ell\bigl(f_{\bm{\theta}}(x),y\bigr),
+\end{equation}
+可以度量该样本上的预测误差大小。理想情况下，我们希望最小化关于数据分布 $\mathcal{D}$ 的期望风险
+\begin{equation}
+    \mathcal{R}(\bm{\theta})
+    = \mathbb{E}_{(x,y)\sim\mathcal{D}}
+    \bigl[\,\ell\bigl(f_{\bm{\theta}}(x), y\bigr)\,\bigr],
+\end{equation}
+但由于 $\mathcal{D}$ 一般未知，只能通过有限训练样本
+\begin{equation}
+    \{(x_i,y_i)\}_{i=1}^{N} \subset \mathcal{X} \times \mathcal{Y}
+\end{equation}
+来近似该期望，从而得到经验风险（经验损失）
+\begin{equation}
+    \hat{\mathcal{R}}_N(\bm{\theta})
+    = \frac{1}{N} \sum_{i=1}^{N}
+    \ell\bigl(f_{\bm{\theta}}(x_i), y_i\bigr).
+\end{equation}
+神经网络训练的过程可以视作求解经验风险最小化问题
+\begin{equation}
+    \min_{\bm{\theta}} \; \hat{\mathcal{R}}_N(\bm{\theta}),
+\end{equation}
+即通过调整参数 $\bm{\theta}$，使平均损失尽可能减小。
+
+从数学性质出发，一个适合作为点损失的函数 $\ell$ 通常需要满足若干基本要求：首先，它应当在模型输出（从而在参数 $\bm{\theta}$）上尽可能可微或次可微，以便应用梯度下降及其变体进行数值优化；其次，对任意预测与真实值组合都有 $\ell \ge 0$，以保证“误差”具有明确的量纲意义；再次，损失值大小应能直观地反映模型性能优劣；最后，在给定任务上，最小化经验风险应与实际评价指标（如准确率、均方误差等）的改善保持一致。
+
+下面给出若干在实践中最常用的点损失函数及其数学表达。
+
+\paragraph{均方误差损失（MSE）}
+
+在回归任务中，常用的点损失是均方误差（mean squared error, MSE）。对单个样本 $(x_i,y_i)$，其点损失定义为
+\begin{equation}
+    \ell_{\mathrm{MSE}}\bigl(f_{\bm{\theta}}(x_i), y_i\bigr)
+    = \bigl( y_i - f_{\bm{\theta}}(x_i) \bigr)^2.
+\end{equation}
+因此，对一批包含 $N$ 个样本的数据，其对应的经验风险可以写为
+\begin{equation}
+    \hat{\mathcal{R}}_N^{\mathrm{MSE}}(\bm{\theta})
+    = \frac{1}{N} \sum_{i=1}^{N}
+    \bigl( y_i - f_{\bm{\theta}}(x_i) \bigr)^2.
+\end{equation}
+可以将 MSE 理解为预测与真实值在欧几里得意义下的平均平方偏差。
+
+针对单个样本，记预测输出为
+\begin{equation}
+    \hat{y} = f_{\bm{\theta}}(x),
+\end{equation}
+则 MSE 点损失可以写为
+\begin{equation}
+    \ell_{\mathrm{MSE}}(\hat{y}, y) = (y - \hat{y})^2,
+\end{equation}
+其对预测值 $\hat{y}$ 的导数为
+\begin{equation}
+    \frac{\partial \,\ell_{\mathrm{MSE}}}{\partial \hat{y}}
+    = -2 \bigl( y - \hat{y} \bigr),
+\end{equation}
+即梯度方向与误差 $(y - \hat{y})$ 一致，且幅度与误差大小成正比：误差越大，对应的梯度越“陡”，相应的参数更新幅度也越显著。
+
+由于误差项被平方放大，MSE 对异常样本较为敏感：少数离群点的巨大偏差可能在整体损失中占据主导地位。在统计学框架下，如果假设观测噪声服从零均值高斯分布，那么最小化 MSE 经验风险等价于在该噪声模型下进行最大似然估计，这也是其被广泛采用的重要理论依据之一。
+
+\paragraph{交叉熵损失}
+
+交叉熵（cross-entropy）损失是分类问题领域的“标配”目标函数，用于衡量真实标签分布 $y$ 与模型预测分布 $\hat{y}$ 之间的差异。在这里，我们可以将 $\hat{y}$ 理解为 $f_{\bm{\theta}}(x)$ 在概率单纯形上的输出向量。在信息论中，交叉熵与 Kullback--Leibler（KL）散度有着紧密联系。
+
+\paragraph{二分类交叉熵}
+
+在二元分类场景中，设第 $i$ 个样本的真实标签为 $y_i \in \{0,1\}$，模型预测其属于正类的概率记为
+\begin{equation}
+    \hat{p}_i = f_{\bm{\theta}}(x_i) \in (0,1),
+\end{equation}
+（通常由 Sigmoid 激活层给出），则对应的点损失为
+\begin{equation}
+    \ell_{\mathrm{BCE}}\bigl(f_{\bm{\theta}}(x_i), y_i\bigr)
+    = -\Bigl[ y_i \log \hat{p}_i
+        + (1 - y_i) \log \bigl(1 - \hat{p}_i\bigr) \Bigr].
+\end{equation}
+其经验风险写作
+\begin{equation}
+    \hat{\mathcal{R}}_N^{\mathrm{BCE}}(\bm{\theta})
+    = \frac{1}{N} \sum_{i=1}^{N}
+    \ell_{\mathrm{BCE}}\bigl(f_{\bm{\theta}}(x_i), y_i\bigr)
+    = -\frac{1}{N} \sum_{i=1}^{N}
+    \Bigl[ y_i \log \hat{p}_i
+        + (1 - y_i) \log \bigl(1 - \hat{p}_i\bigr) \Bigr].
+\end{equation}
+
+\paragraph{多分类交叉熵}
+
+对于具有 $C$ 个类别的多分类任务，记 $y_{i,c} \in \{0,1\}$ 为第 $i$ 个样本在第 $c$ 类上的真实标签（通常采用 one-hot 编码，真实类别对应分量为 1，其余为 0），模型预测该样本属于第 $c$ 类的概率记为
+\begin{equation}
+    \hat{p}_{i,c} = f_{\bm{\theta}}(x_i)_c,
+\end{equation}
+通常由 Softmax 输出得到。则该样本的多分类交叉熵点损失为
+\begin{equation}
+    \ell_{\mathrm{CE}}\bigl(f_{\bm{\theta}}(x_i), y_i\bigr)
+    = -\sum_{c=1}^{C} y_{i,c} \log \hat{p}_{i,c},
+\end{equation}
+对应的经验风险为
+\begin{equation}
+    \hat{\mathcal{R}}_N^{\mathrm{CE}}(\bm{\theta})
+    = \frac{1}{N} \sum_{i=1}^{N}
+    \ell_{\mathrm{CE}}\bigl(f_{\bm{\theta}}(x_i), y_i\bigr)
+    = -\frac{1}{N} \sum_{i=1}^{N} \sum_{c=1}^{C}
+    y_{i,c} \log \hat{p}_{i,c}.
+\end{equation}
+
+当交叉熵与 Softmax 联合使用时，其相对于 Softmax 输入 $z_j$（即未归一化的对数几率）的梯度具有特别简洁的形式。记
+\begin{equation}
+    \hat{p}_j
+    = \frac{\exp(z_j)}{\sum_{k=1}^{C} \exp(z_k)},
+\end{equation}
+则有
+\begin{equation}
+    \frac{\partial \,\ell_{\mathrm{CE}}}{\partial z_j}
+    = \hat{p}_j - y_j,
+\end{equation}
+其中 $y_j$ 与 $\hat{p}_j$ 分别是真实分布和预测分布在第 $j$ 个类别上的分量。可以将其理解为“预测概率减去真实概率”：偏差越大，对应的梯度绝对值越大；当预测逐步逼近真实分布时，梯度自然衰减至接近零。
+
+与 MSE 相比，交叉熵在分类任务中往往能提供更有力的学习信号：当模型给出明显错误的分类概率时，交叉熵对应的梯度较大，有利于快速纠正参数；而在高维类别空间或预测概率接近 $0/1$ 的情况下，这种性质尤为重要，有助于提升训练收敛速度和稳定性。
+
+\subsection{优化算法}
+
+在深度学习中，优化算法通过迭代更新模型参数以最小化经验风险，从而提升模型在训练数据上的拟合效果。以一般的经验风险
+\begin{equation}
+    \hat{\mathcal{R}}_N(\bm{\theta})
+    = \frac{1}{N} \sum_{i=1}^{N}
+    \ell\bigl(f_{\bm{\theta}}(x_i), y_i\bigr)
+\end{equation}
+为例，最基本的梯度下降更新可以写为
+\begin{equation}
+    \bm{\theta}_{k+1}
+    = \bm{\theta}_{k}
+    - \eta \,\nabla_{\bm{\theta}}
+    \hat{\mathcal{R}}_N(\bm{\theta}_{k}),
+\end{equation}
+其中 $\bm{\theta}_{k}$ 表示第 $k$ 次迭代的模型参数，$\eta > 0$ 为学习率，$\nabla_{\bm{\theta}} \hat{\mathcal{R}}_N$ 为经验风险关于参数的梯度。标准梯度下降在处理大规模数据集和高维参数空间时，往往面临计算开销大、收敛速度较慢等问题，因此实际应用中通常采用随机梯度下降及其各种改进变体（如 Momentum、Adam 等）来提升优化效率与稳定性。
+
+接下来，我们将简要介绍几种常用的优化算法。
+
+\subsubsection{随机梯度下降（SGD）}
+随机梯度下降（Stochastic Gradient Descent, SGD）是一种基于小批量数据近似计算梯度的优化方法。与标准梯度下降每次迭代都需计算整个训练集的梯度不同，SGD 在每次迭代中仅使用一个或一个小批量（mini-batch）样本来估计梯度，从而大幅降低了每次更新的计算成本。
+
+从经验风险最小化的角度看，标准梯度下降在第 $k$ 次迭代时需要计算整个训练集上的梯度
+\begin{equation}
+    \nabla_{\bm{\theta}} \hat{\mathcal{R}}_N(\bm{\theta}_k)
+    = \frac{1}{N} \sum_{i=1}^{N}
+    \nabla_{\bm{\theta}} \, \ell\bigl(f_{\bm{\theta}_k}(x_i), y_i\bigr),
+\end{equation}
+当样本规模 $N$ 非常大时，单次迭代的计算代价会变得难以承受。SGD 的核心思想是：由于梯度可以看作是真实梯度的随机无偏估计，我们可以用一小批样本来近似整体梯度，从而显著降低单次迭代的计算量。
+
+具体而言，在算法的每一步，我们从训练集中均匀随机抽取一小批量样本构成 batch：
+\begin{equation}
+    \mathcal{B}_k = \bigl\{(x_i, y_i)\bigr\}_{i=1}^{B}, \\qquad |\mathcal{B}_k| = B,
+\end{equation}
+其中 $B$ 为 batch 大小，并且在训练过程中保持一个固定的数量级。利用该小批量上的经验风险
+\begin{equation}
+    \hat{\mathcal{R}}_{\mathcal{B}_k}(\bm{\theta})
+    = \frac{1}{B} \sum_{(x,y) \in \mathcal{B}_k}
+    \ell\bigl(f_{\bm{\theta}}(x), y\bigr),
+\end{equation}
+对其求梯度并进行更新，就得到 SGD 的迭代格式：
+\begin{equation}
+    \bm{\theta}_{k+1}
+    = \bm{\theta}_{k}
+    - \eta \,\nabla_{\bm{\theta}}
+    \hat{\mathcal{R}}_{\mathcal{B}_k}(\bm{\theta}_{k}).
+\end{equation}
+当 $B=1$ 时，这一更新规则退化为经典意义上的“逐样本”随机梯度下降；当 $1 < B \ll N$ 时，则对应通常所说的小批量 SGD。通过这种方式，SGD 能够在每次迭代中快速更新参数，并在一定程度上利用梯度估计中的噪声来跳出局部极小值，从而有助于提升模型的泛化能力。
+
+\subsubsection{动量法}
+动量法（Momentum）是一种在随机梯度下降基础上引入“惯性”概念的优化算法，旨在加速收敛过程并减少参数更新中的振荡现象。其核心思想是通过累积过去梯度的信息，形成一个“动量”向量，从而在更新参数时不仅考虑当前梯度，还参考之前的更新方向。具体而言，动量法在每次迭代中维护一个动量向量 $\bm{v}_k$，其更新规则为
+\begin{equation}
+    \bm{v}_{k+1}
+    = \beta \,\bm{v}_k
+    + (1 - \beta) \,\nabla_{\bm{\theta}}
+    \hat{\mathcal{R}}_{\mathcal{B}_k}(\bm{\theta}_{k}),
+\end{equation}
+其中 $\beta \in [0,1)$ 为动量系数，控制过去梯度对当前动量的影响程度。随后，参数更新则基于该动量向量进行：
+\begin{equation}
+    \bm{\theta}_{k+1}
+    = \bm{\theta}_{k}
+    - \eta \,\bm{v}_{k+1}.
+\end{equation}
+
+通过引入动量，优化过程能够在梯度方向上形成一种“惯性”，从而在陡峭的损失曲面上加速下降，同时在平坦区域减少振荡。这种机制有助于提升收敛速度，尤其是在面对高曲率、噪声较大的梯度估计时表现尤为显著。
+
+\subsubsection{Adam算法}
+Adam（adaptive moment estimation）是一种在 RMSProp 的基础上引入一阶动量信息的自适应学习率算法，可以看作结合了动量法和自适应梯度方法优点的折中方案。在该优化算法中，同时维护梯度的一阶矩（期望）和二阶矩（平方期望）的指数衰减滑动平均，并对它们进行偏差校正，从而得到更稳定的更新方向。
+
+记第 $t$ 次迭代的模型参数为 $\bm{\theta}_t$，对应的小批量经验风险为
+\begin{equation}
+    \hat{\mathcal{R}}_{\mathcal{B}_t}(\bm{\theta})
+    = \frac{1}{B} \sum_{(x,y) \in \mathcal{B}_t}
+    \ell\bigl(f_{\bm{\theta}}(x), y\bigr),
+\end{equation}
+其关于参数的梯度记为
+\begin{equation}
+    \bm{g}_t
+    = \nabla_{\bm{\theta}}
+    \hat{\mathcal{R}}_{\mathcal{B}_t}(\bm{\theta}_t).
+\end{equation}
+Adam 在每一步维护一阶矩估计 $\bm{m}_t$ 和二阶矩估计 $\bm{v}_t$：
+\begin{equation}
+    \bm{m}_t = \beta_1 \, \bm{m}_{t-1} + (1-\beta_1) \, \bm{g}_t,
+\end{equation}
+\begin{equation}
+    \bm{v}_t = \beta_2 \, \bm{v}_{t-1} + (1-\beta_2) \, \bm{g}_t^{2},
+\end{equation}
+其中 $\beta_1, \beta_2 \in [0,1)$ 分别控制一阶矩和二阶矩的指数衰减系数，$\bm{g}_t^{2}$ 表示对梯度向量做按元素平方。
+
+由于 $\bm{m}_t$ 与 $\bm{v}_t$ 初始时通常取零向量，在迭代初期会存在偏向于零的估计偏差。Adam 通过引入偏差校正因子
+\begin{equation}
+    \hat{\bm{m}}_t = \frac{\bm{m}_t}{1-\beta_1^t},
+    \qquad
+    \hat{\bm{v}}_t = \frac{\bm{v}_t}{1-\beta_2^t},
+\end{equation}
+得到更接近真实矩的无偏估计。最终的参数更新公式可以写为
+\begin{equation}
+    \bm{\theta}_{t+1}
+    = \bm{\theta}_t
+    - \eta \, \frac{\hat{\bm{m}}_t}{\sqrt{\hat{\bm{v}}_t} + \varepsilon},
+\end{equation}
+其中所有除法和开方运算均按元素进行，$\eta > 0$ 为基础学习率，$\varepsilon$ 是一个防止分母为零的极小正数（例如 $10^{-8}$）。常用的超参数设置为 $\beta_1 = 0.9$、$\beta_2 = 0.999$。
+
+需要指出的是，早期关于 Adam 收敛性的理论分析并不完备，后续研究表明其在某些凸目标函数上可能不收敛。但在大量实际深度学习任务中，Adam 凭借鲁棒的表现和较少的超参数调节需求，依然是最为常用的优化算法之一。
+
+\subsection{自动微分}
+自动微分（automatic differentiation, AD）是一类用于高效、精确计算由计算机程序定义的函数导数的技术，在深度学习和科学计算中具有基础性的作用。与传统的数值微分和符号微分不同，自动微分既不是单纯的数值近似方法，也不是先把函数完全写成封闭形式再求导，而是直接在给定的计算过程（程序）上施加规则：只要给出计算函数值的算法，就可以在机器精度范围内同时获得其导数，而无需显式写出解析导数表达式。
+
+自动微分的出发点是：任何在计算机上实现的复杂函数，最终都由有限次基本算术运算（加、减、乘、除等）和初等函数调用（如指数、对数、正弦、余弦等）组合而成。沿着这一计算图，在程序执行时对每一步基本运算反复应用链式法则，就可以系统地传播梯度，在几乎只增加一个常数倍计算量的前提下，自动得到目标函数对输入变量的偏导数，甚至高阶导数。与基于有限差分的数值微分相比，自动微分在理论上是“精确”的（仅受浮点舍入误差的影响），不会额外引入由步长带来的截断误差；而相对于符号微分，它避免了中间表达式指数级膨胀及由此导致的求值效率低下问题。
+
+从方法论的角度看，自动微分相较其他求导手段有若干显著优势。符号微分往往需要将包含分支、循环等结构的程序重写为单一的解析表达式，这在工程上非常困难，即便成功得到导数，其表达式也可能极其庞大，不利于数值求值。数值微分依赖有限差分近似，容易受到步长选择、舍入误差与差分相消等因素的影响，在高阶导数或高维输入情形下误差和计算代价会迅速累积。相比之下，自动微分可以在求解任意复杂函数值的同时，以常数量级的额外开销获得梯度或雅可比矩阵，尤其适合大规模梯度驱动的优化算法和深度神经网络训练过程。
+
+在具体实现层面，自动微分通常有两种基本模式：前向模式（forward mode）和反向模式（reverse mode）。二者本质上都是沿着计算图应用链式法则，只是传播导数信息的方向不同。
+
+为便于说明，考虑一个由若干中间变量串联构成的标量函数
+\begin{equation}
+    x = w_0 \longrightarrow w_1 \longrightarrow w_2 \longrightarrow \cdots \longrightarrow w_L = y,
+\end{equation}
+其中 $x$ 为输入，$y$ 为输出，$w_i$ 为第 $i$ 步计算得到的中间量。前向模式的做法是在计算 $w_i$ 的同时递推其对输入的导数 $\partial w_i/\partial x$：
+\begin{equation}
+    \frac{\partial w_i}{\partial x}
+    = \frac{\partial w_i}{\partial w_{i-1}}
+    \frac{\partial w_{i-1}}{\partial x},
+    \qquad i = 1,\dots,L,
+\end{equation}
+初始“种子”为 $\partial x/\partial x = 1$。这样在一次从输入到输出的前向计算过程中，即可同时得到目标函数相对于某一个输入分量的导数。
+
+与之相对，反向模式则在完成一次前向计算、得到所有 $w_i$ 之后，从输出端向输入端反向传播 $\partial y/\partial w_i$：
+\begin{equation}
+    \frac{\partial y}{\partial w_i}
+    = \frac{\partial y}{\partial w_{i+1}}
+    \frac{\partial w_{i+1}}{\partial w_i},
+    \qquad i = L-1,\dots,0,
+\end{equation}
+其“种子”为 $\partial y/\partial y = 1$。完成这一反向传播后，就同时得到了输出对所有中间量乃至输入变量的导数，这正是深度学习中反向传播算法（backpropagation）的数学本质。
+
+这两种模式在高维情形下的效率差异十分关键。设目标函数为
+\begin{equation}
+    f : \mathbb{R}^n \to \mathbb{R}^m.
+\end{equation}
+可以通过比较输入维度 $n$ 与输出维度 $m$ 来区分前向模式和反向模式各自更合适的应用场景：
+\begin{itemize}
+    \item 当 $n \ll m$ 时，前向模式通常更为合适：对每一个输入分量执行一次前向传播，即可得到雅可比矩阵中对应的一列导数，总代价约为 $n$ 次计算图遍历。
+    \item 相反，当 $n \gg m$ 时（典型情形是深度学习中的标量损失函数 $m=1$，而参数维度 $n$ 极大），反向模式更具优势：只需一次前向传播和一次反向传播，就能同时获得损失函数对所有参数的梯度；若采用前向模式，则需要对每一个参数方向单独进行一次前向传播，计算开销难以接受。因此，在现代深度学习框架中，几乎一律采用反向模式自动微分来实现神经网络训练中的梯度计算。
+\end{itemize}
+
+\subsection{深度学习的并行计算与 JAX 框架}
+
+\subsubsection{并行计算与GPU简述}
+
+并行计算是将一个大规模问题拆分为若干可以同时处理的子任务，并在多个计算单元上协同执行，以缩短整体求解时间的计算范式。
+
+在较长一段时间内，通用处理器主要依赖提高时钟频率和增加指令级并行度来提升性能。然而，由于功耗和散热方面的物理约束，单核频率的继续提升变得越来越困难，单核性能增长明显放缓。为此，处理器架构逐渐转向多核化：在同一芯片上集成多个计算核心，通过在不同核心上同时执行多个线程来提高整体吞吐率。要有效利用这类硬件，程序需要在算法层面显式暴露可并行的任务或数据，从而将串行程序改写为并行程序。
+
+与通用 CPU 相比，图形处理器（GPU）采用了数量众多、较为简化的计算核心，并通过单指令多线程（SIMT）等执行模型，在同一时间对大量数据元素执行相同或类似的运算。最初这种架构是为图形渲染场景设计的，例如对屏幕上成千上万个像素执行相同的着色计算。随后，人们逐渐认识到，许多与图形无关的计算问题——尤其是以矩阵、张量运算为核心、可高度数据并行化的任务——同样可以映射到 GPU 上执行，从而显著提升性能，这一方向通常被称为通用 GPU 计算（GPGPU）。
+
+\todo[inline]{加入 GPU 架构图示}
+
+在深度学习训练和推理中，大量计算可以抽象为矩阵乘法、卷积以及逐点非线性变换等操作，本质上具有很强的数据并行性。因此，现代深度学习框架通常将这些算子下放到 GPU 上执行，并通过批处理和向量化来充分利用 GPU 的高吞吐特性。GPU 在这一场景下并非通用意义上的“更快处理器”，而是针对大规模、规则数据并行计算进行了硬件优化的加速器，这也是其在深度学习及科学计算中得到广泛应用的主要原因。
+
+\subsubsection{深度学习中的典型并行计算模式}
+
+如前所述，深度学习的训练过程旨在最小化经验风险 $\hat{\mathcal{R}}(\bm{\theta}; \mathcal{D})$。在参数量 $P$ 和数据集规模巨大的情况下，单机训练往往难以满足效率需求，因此并行计算成为必然选择。并行化的核心在于如何分布式地计算梯度 $\nabla \hat{\mathcal{R}}_{\mathcal{B}}(\bm{\theta})$ 或执行前向/反向传播。
+
+\paragraph{数据并行}
+
+数据并行通过对数据维度进行划分来实现并行。
+
+在数学上，将小批量 $\mathcal{B}$ 划分为 $K$ 个不相交的子批量 $\{\mathcal{B}_1, \mathcal{B}_2, \dots, \mathcal{B}_K\}$，满足 $\mathcal{B} = \bigcup_{k=1}^K \mathcal{B}_k$ 且 $|\mathcal{B}| = \sum_{k=1}^K |\mathcal{B}_k|$。根据梯度计算的线性性质（对于许多常用损失函数，如 MSE、交叉熵，该性质成立），整体梯度可以分解为：
+\begin{equation}
+    \begin{aligned}
+        \nabla \hat{\mathcal{R}}_{\mathcal{B}}(\bm{\theta})
+         & = \frac{1}{|\mathcal{B}|} \sum_{(\bm{x}, y) \in \mathcal{B}} \nabla \ell(\bm{\theta}; \bm{x}, y)                                                   \\
+         & \approx \frac{1}{K} \sum_{k=1}^K \left( \frac{1}{|\mathcal{B}_k|} \sum_{(\bm{x}, y) \in \mathcal{B}_k} \nabla \ell(\bm{\theta}; \bm{x}, y) \right)
+        = \frac{1}{K} \sum_{k=1}^K \bm{g}_k,
+    \end{aligned}
+\end{equation}
+其中 $\bm{g}_k = \nabla \hat{\mathcal{R}}_{\mathcal{B}_k}(\bm{\theta})$ 是第 $k$ 个设备基于子批量 $\mathcal{B}_k$ 计算得到的本地梯度。
+
+其具体的执行模式如下：
+\begin{enumerate}
+    \item 在 $K$ 个设备上复制完整的模型参数 $\bm{\theta}$。
+    \item 每个设备 $k$ 独立计算本地梯度 $\bm{g}_k$。
+    \item 通过全局归约（All-Reduce）通信原语对所有设备的 $\{\bm{g}_1, \dots, \bm{g}_K\}$ 进行求和与平均，得到全局梯度 $\bm{g} = \frac{1}{K} \sum_{k=1}^K \bm{g}_k$。
+    \item 所有设备同步地使用 $\bm{g}$ 更新参数：$\bm{\theta} \leftarrow \bm{\theta} - \eta \bm{g}$。
+\end{enumerate}
+
+下面分析其计算与通信复杂度。
+\begin{itemize}
+    \item 计算量方面，每个设备执行一次前向和反向传播的计算复杂度为 $O(|\mathcal{B}_k| \cdot C(P))$，其中 $C(P)$ 是处理单个样本的复杂度，与模型参数量 $P$ 相关。
+    \item 通信量方面，每次迭代需要同步 $P$ 个参数（即梯度向量），通信复杂度为 $O(P)$。这是数据并行的主要瓶颈。当模型参数量 $P$ 极大时，通信开销可能主导单次迭代时间。
+\end{itemize}
+
+\paragraph{模型并行}
+
+模型并行通过对模型（参数空间）本身进行划分来实现并行。其数学本质是将复合函数分解为多个子函数。
+
+从数学角度看，将模型 $F$ 视为 $L$ 个层的复合函数：
+\begin{equation}
+    F(\bm{x}) = f_L \circ f_{L-1} \circ \dots \circ f_1(\bm{x}; \bm{\theta}_1, \bm{\theta}_2, \dots, \bm{\theta}_L),
+\end{equation}
+模型并行即是将这些层（或一个层内部的运算）划分到不同的设备上。
+
+设我们将模型划分为 $M$ 个分区 $\{P_1, P_2, \dots, P_M\}$，每个分区 $P_m$ 包含一组连续的层及其参数 $\bm{\theta}_m$。则前向传播可以表示为：
+\begin{equation}
+    \begin{aligned}
+        \bm{h}_0 & = \bm{x},                                      \\
+        \bm{h}_1 & = P_1(\bm{h}_0; \bm{\theta}_1),                \\
+        \bm{h}_2 & = P_2(\bm{h}_1; \bm{\theta}_2),                \\
+                 & \dots                                          \\
+        \bm{y}   & = \bm{h}_M = P_M(\bm{h}_{M-1}; \bm{\theta}_M),
+    \end{aligned}
+\end{equation}
+其中 $\bm{h}_m$ 是第 $m$ 个分区输出的激活值。
+
+该方法的执行模式与通信过程如下：数据 $\bm{x}$ 首先进入设备 1（持有 $P_1$），计算得到 $\bm{h}_1$。设备 1 将 $\bm{h}_1$ 发送给设备 2。设备 2 计算 $\bm{h}_2 = P_2(\bm{h}_1; \bm{\theta}_2)$，并传递给设备 3，依此类推。反向传播是相反的过程，梯度 $\frac{\partial \hat{\mathcal{R}}}{\partial \bm{h}_m}$ 需要从设备 $m+1$ 传递回设备 $m$。
+
+以张量并行为例，考虑一个线性层 $\bm{y} = \bm{x}A$，其中 $\bm{x} \in \mathbb{R}^{b \times d_{in}}$, $A \in \mathbb{R}^{d_{in} \times d_{out}}$。若 $d_{out}$ 过大，可将权重矩阵 $A$ 按列划分：$A = [A_1 | A_2 | \dots | A_M]$，其中 $A_m \in \mathbb{R}^{d_{in} \times (d_{out}/M)}$。该运算可并行化为：
+\begin{enumerate}
+    \item 每个设备 $m$ 计算 $\bm{y}_m = \bm{x}A_m$；
+    \item 通过 All-Gather 通信，所有设备都获得完整的输出 $\bm{y} = [\bm{y}_1, \bm{y}_2, \dots, \bm{y}_M]$。
+\end{enumerate}
+
+其计算与通信复杂度分析如下。
+\begin{itemize}
+    \item 计算量方面，每个设备负责的计算量从 $O(b \cdot d_{in} \cdot d_{out})$ 降低到 $O(b \cdot d_{in} \cdot (d_{out}/M))$（假设均匀划分为 $M$ 份）。
+    \item 通信量方面，通信发生在分区边界。对于上述张量并行例子，每次前向传播需要交换的通信量为 $O(b \cdot d_{out})$。通信复杂度通常与激活值张量的尺寸成正比，而与模型总参数量 $P$ 无直接关系。
+\end{itemize}
+
+\subsection{JAX 的计算模型与 XLA 编译}
+
+JAX 是 Google 开发的一个专为高性能数值计算和机器学习研究设计的 Python 库。它巧妙地结合了 NumPy 的易用性与自动微分、即时编译（JIT）等高级特性。JAX 的核心设计理念在于“可组合的函数变换”：用户可以像编写数学公式一样编写纯 Python 函数，而 JAX 则负责通过一系列变换将其编译并高效调度到 CPU、GPU 或 TPU 等硬件加速器上执行。
+
+虽然 JAX 提供了一套与 NumPy 高度兼容的 API，使得熟悉 NumPy 的研究者能够无缝迁移，但其底层实现机制截然不同。JAX 的计算后端基于 XLA（Accelerated Linear Algebra）编译器，这是一个强大的机器学习编译器生态系统，能够对计算图进行全局优化（如算子融合），从而显著提升执行效率。
+
+\paragraph{即时编译（JIT）}
+针对 Python 解释执行在处理大量细粒度运算时的性能瓶颈，JAX 通过 \texttt{jax.jit} 变换引入了即时编译机制。该机制能够追踪函数的执行轨迹（tracing），将其转换为 XLA 中间表示（IR），进而执行算子融合、内存优化等一系列编译优化，最终生成针对特定硬件架构的高效机器码。这种编译优化能大幅提升计算速度。
+
+\paragraph{自动微分}
+承接前文对自动微分原理的介绍，JAX 提供了对应于反向模式和前向模式的高层 API。
+最常用的 \texttt{jax.grad} 变换对应于反向模式自动微分（Reverse Mode AD）。对于标量函数 $f: \mathbb{R}^n \to \mathbb{R}$，\texttt{jax.grad(f)} 返回一个计算梯度 $\nabla f$ 的新函数。在深度学习训练循环中，我们通常需要同时获得损失函数的值和梯度，JAX 为此提供了 \texttt{jax.value\_and\_grad} 变换，它能够通过一次前向传播和一次反向传播同时计算 $f(x)$ 和 $\nabla f(x)$，避免了重复计算带来的开销。
+对于向量值函数 $f: \mathbb{R}^n \to \mathbb{R}^m$，我们需要计算其雅可比矩阵 $J \in \mathbb{R}^{m \times n}$。JAX 提供了 \texttt{jax.jacfwd} 和 \texttt{jax.jacrev} 两个变换，分别对应前向模式和反向模式：
+\begin{itemize}
+    \item \texttt{jax.jacfwd} 使用前向模式，其计算代价与输入维度 $n$ 成正比，适用于 $n < m$ 的情形（如“窄”网络）；
+    \item \texttt{jax.jacrev} 使用反向模式，其计算代价与输出维度 $m$ 成正比，适用于 $n > m$ 的情形（如典型的神经网络梯度计算）。
+\end{itemize}
+这种灵活的选择机制使得用户能够根据具体问题的维度特征选择最优的微分策略。
+
+\paragraph{自动向量化}
+在单设备（如单个 GPU）上，为了充分利用硬件的并行计算能力，通常需要以批处理（Batching）的形式进行计算。传统的做法要求用户手动处理张量的批次维度，这往往导致代码逻辑复杂且易错。
+JAX 提供了 \texttt{jax.vmap}（Vectorizing Map）变换来实现自动向量化。给定一个处理单个样本的函数 $f: \mathcal{X} \to \mathcal{Y}$，\texttt{jax.vmap(f)} 会自动生成一个处理批次数据的函数 $F: \mathcal{X}^B \to \mathcal{Y}^B$。
+从数学上看，若输入批次为 $X = \{x_1, x_2, \dots, x_B\}$，则
+\begin{equation}
+    \texttt{vmap}(f)(X) = \{f(x_1), f(x_2), \dots, f(x_B)\}.
+\end{equation}
+在底层实现中，\texttt{vmap} 并非简单的串行循环，而是将批次维度“下推”至基本运算算子中，生成高度优化的向量化指令，从而在单设备上实现高效的数据并行。
+
+
+\subsection{JAX 中的并行计算}
+JAX 采用单程序多数据（Single-Program Multi-Data, SPMD）的并行计算模型。在这种模式下，同一套计算逻辑（例如神经网络的前向传播函数）被分发到多个设备（如多个 GPU 或 TPU 核心）上并行执行，但每个设备处理的是输入数据的不同部分。这种机制使得大规模深度学习模型的训练能够高效地扩展到多设备集群上。
+
+实现 SPMD 并行的核心在于“数据分片”（Data Sharding），即如何将一个逻辑上的全局大数组切分并放置在不同的物理设备上。JAX 通过统一的 \texttt{jax.Array} 数据结构来支持这一特性。与传统的 NumPy 数组不同，\texttt{jax.Array} 是为分布式计算设计的，它代表了一个在物理存储上可能跨越多个设备的逻辑数组。
+
+为了描述数据的分布方式，每个 \texttt{jax.Array} 都关联一个 \texttt{jax.sharding.Sharding} 对象。该对象定义了全局数据与物理设备网格之间的映射关系，明确了每个设备应当持有全局数据的哪一部分（即哪一个分片）。当用户创建或操作 \texttt{jax.Array} 时，JAX 会根据其分片属性自动推导计算图中的通信需求，并在底层插入必要的集合通信原语。这种设计使得用户在编写并行代码时，往往可以像编写单机代码一样操作逻辑数组，而将复杂的跨设备数据管理和同步任务交给 JAX 运行时自动处理。
+
+\section{深度学习在偏微分方程求解中的应用}
+
+基于深度学习的偏微分方程（PDE）求解方法利用神经网络作为通用函数逼近器，通过最小化包含物理约束的损失函数来寻找数值解。相比传统网格方法，该类方法在处理高维问题、复杂几何区域以及反问题时具有显著优势，且无需显式网格划分。
+
+本节将重点介绍该领域的两种主要范式：一是直接对解函数进行参数化建模的物理信息神经网络（PINN），旨在求解特定方程实例；二是致力于学习解算子的神经算子（Neural Operator）方法，侧重于学习从方程参数到解函数的映射规则。下文将分别阐述这两种方法的数学原理、算法实现及其应用特性。
+
+\subsection{物理信息神经网络 (PINN)}
+物理信息神经网络（Physics-Informed Neural Networks, PINN）是一种将偏微分方程（PDE）的物理约束直接嵌入到神经网络损失函数中的深度学习求解方法。其核心思想是利用神经网络强大的函数逼近能力来近似PDE的解，并通过自动微分技术精确计算方程中的微分算子，从而构造出包含物理残差的优化目标。
+
+PINN 主要用于解决如下形式的一般非线性偏微分方程：
+\begin{equation}
+    u_t + \mathcal{N}[u] = 0, \quad x \in \Omega, \quad t \in [0, T],
+\end{equation}
+其中 $u(t, x)$ 表示待求的解函数（潜在解），$\mathcal{N}[\cdot]$ 是一个非线性微分算子，$\Omega$ 是 $\mathbb{R}^d$ 的子集。
+
+为了求解该问题，我们定义物理残差函数 $f(t, x)$ 为方程左端项：
+\begin{equation}
+    f := u_t + \mathcal{N}[u].
+\end{equation}
+接着，我们使用一个深度神经网络来近似解 $u(t, x)$。基于该假设，利用自动微分技术对神经网络进行求导，可以得到物理残差 $f(t, x)$ 的神经网络表示。这就构成了一个“物理信息神经网络”。
+
+PINN 的训练过程旨在同时最小化观测数据（或边界/初始条件）上的误差以及物理方程的残差。损失函数通常定义为：
+\begin{equation}
+    \mathcal{L}(\bm{\theta}) = \mathcal{L}_{u}(\bm{\theta}) + \mathcal{L}_{f}(\bm{\theta}),
+\end{equation}
+其中 $\mathcal{L}_{u}$ 对应于初始和边界条件数据的均方误差，$\mathcal{L}_{f}$ 对应于物理方程残差的均方误差：
+\begin{equation}
+    \mathcal{L}_{u}(\bm{\theta}) = \frac{1}{N_u} \sum_{i=1}^{N_u} \left| u(t_u^i, x_u^i) - u^i \right|^2,
+\end{equation}
+\begin{equation}
+    \mathcal{L}_{f}(\bm{\theta}) = \frac{1}{N_f} \sum_{i=1}^{N_f} \left| f(t_f^i, x_f^i) \right|^2.
+\end{equation}
+这里 $\{t_u^i, x_u^i, u^i\}_{i=1}^{N_u}$ 表示初始和边界上的训练数据点，$\{t_f^i, x_f^i\}_{i=1}^{N_f}$ 表示用于计算物理残差的配点（collocation points）。通过最小化该损失函数，网络参数 $\bm{\theta}$ 被优化，从而使得神经网络 $u(t, x)$ 既符合观测数据又满足物理方程约束。
+
+\subsection{神经算子 (Neural Operator)}
+神经算子（Neural Operator）代表了深度学习求解 PDE 的另一种范式。与 PINN 针对特定方程实例求解单一解 $u(t,x)$ 不同，神经算子旨在学习从一个函数空间到另一个函数空间的映射算子。
+
+从数学角度来看，设 $D \subset \mathbb{R}^d$ 为一个有界区域，$\mathcal{A}$ 和 $\mathcal{U}$ 分别为定义在 $D$ 上的巴拿赫空间（Banach spaces）。其中，$\mathcal{A}$ 通常对应于输入参数的函数空间（如初始条件、边界条件或方程系数），$\mathcal{U}$ 则对应于解函数的空间。神经算子的核心目标是学习一个非线性算子 $\mathcal{G}: \mathcal{A} \to \mathcal{U}$，使得对于任意输入函数 $a \in \mathcal{A}$，其映射得到的解 $u = \mathcal{G}(a)$ 满足特定的物理定律（通常由 PDE 描述）。具体而言，对于区域内的任意点 $x \in D$，解函数的值可表示为 $u(x) = (\mathcal{G}(a))(x)$。
+
+在实际计算中，假设我们获取了 $N$ 组观测数据对 $\{ (a_j, u_j) \}_{j=1}^N$。其中，输入函数 $a_j$ 采样自概率测度 $\mu$，而 $u_j = \mathcal{G}(a_j)$ 是对应的真实解（通常由传统数值方法生成）。神经算子方法通过构造一个参数化的算子 $\mathcal{G}_{\bm{\theta}}: \mathcal{A} \to \mathcal{U}$（即神经网络），并最小化如下定义的经验风险来逼近真实算子 $\mathcal{G}$：
+\begin{equation}
+    \min_{\bm{\theta}} \mathcal{L}(\bm{\theta}) = \min_{\bm{\theta}} \frac{1}{N} \sum_{j=1}^N \| \mathcal{G}_{\bm{\theta}}(a_j) - u_j \|_{\mathcal{U}}^2,
+\end{equation}
+其中 $\| \cdot \|_{\mathcal{U}}$ 是输出空间 $\mathcal{U}$ 上的范数（通常为 $L^2$ 范数）。
+
+% 神经算子最显著的优势在于其具备离散化不变性（discretization-invariance）。这意味着训练得到的网络参数 $\bm{\theta}$ 并不依赖于特定的网格离散方式。一旦模型训练完成，$\mathcal{G}_{\bm{\theta}}$ 即可在任意分辨率的网格上对新的输入 $a$ 进行推理，从而以极低的计算代价快速预测解 $u$。这种特性使得神经算子在需要针对不同参数反复求解同一方程的场景（如反问题求解、优化控制等）中具有极高的应用价值。
+
+在神经算子的众多架构中，DeepONet 和 Fourier Neural Operator (FNO) 是最为典型且应用广泛的两种框架。
+\todo[inline]{加点图}
+\subsubsection{DeepONet}
+DeepONet 是由 Lu 等人基于算子通用逼近定理（Universal Approximation Theorem for Operators）提出的一种神经算子架构。该定理指出，对于非线性连续算子，可以通过单层神经网络进行任意精度的逼近。DeepONet 的核心设计包含两个子网络：
+\begin{itemize}
+    \item \textbf{Branch Net（分支网络）}：用于处理输入函数 $a$。它将离散的输入函数值（即在特定传感器点上的观测值）映射为一个特征向量 $[b_1, b_2, \dots, b_p]^T$。
+    \item \textbf{Trunk Net（主干网络）}：用于处理查询坐标 $y$。它将输出域中的坐标点映射为另一个特征向量 $[t_1, t_2, \dots, t_p]^T$。
+\end{itemize}
+最终，算子在 $y$ 处的输出值 $\mathcal{G}(a)(y)$ 通过这两个特征向量的点积来计算：
+\begin{equation}
+    \mathcal{G}(a)(y) \approx \sum_{k=1}^p b_k(a) t_k(y) + b_0.
+\end{equation}
+这种架构使得 DeepONet 能够灵活地处理不同的输入，并且在学习连续算子方面表现出良好的泛化能力。
+
+\subsubsection{Fourier Neural Operator (FNO)}
+Fourier Neural Operator (FNO) 是由 Li 等人提出的一种基于频域学习的神经算子。其数学基础在于，许多偏微分方程的解算子可以视为积分算子（如格林函数卷积），而在频域中，卷积操作转化为简单的乘法操作。
+
+FNO 的网络结构由若干个傅里叶层（Fourier Layer）堆叠而成。每一个傅里叶层的计算过程如下：
+\begin{enumerate}
+    \item 首先，对输入特征进行快速傅里叶变换（FFT），将其从物理空间变换到频域；
+    \item 在频域中，保留低频分量，并对其应用一个可学习的线性变换（即复数权重矩阵乘法）；
+    \item 最后，通过逆快速傅里叶变换（IFFT）将特征变换回物理空间，并加上一个残差连接（通常是 $1 \times 1$ 卷积）和非线性激活函数。
+\end{enumerate}
+
+
+
