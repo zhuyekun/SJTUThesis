@@ -1,0 +1,230 @@
+\section{训练方法}
+\label{sec:training}
+
+本节介绍用于训练神经网络模型的整体框架。该模型旨在近似辐射传输方程（RTE）中的格林函数。我们的做法基于 Delta 函数数据集：通过高斯函数近似边界条件，构造一族“类 Dirac”的入射边界源。借助这一设计，即便模型在训练阶段只接触到 Delta 型边界条件，仍能对未见过的一般边界条件保持良好的外推能力，其作用类似于预训练：先在通用任务上学习可迁移的算子结构，再迁移到具体边界条件上。下面将分别介绍训练数据集的构造、基于均方误差的损失函数以及基于相对误差的评估指标。
+
+\subsection{RTE 数据集特征}
+
+为便于实现与复现实验，我们将每个训练样本的输入与输出统一组织为若干张量特征，见表~\ref{tab:rte_features}。
+
+\begin{table}[!htp]
+    \centering
+    \begin{tabular}{lll}
+        \toprule
+        特征形状                                              & 描述                                                       \\
+        \midrule
+        \texttt{phase\_coords}: $[N_{\text{coords}},2d]$  & 相空间坐标 $(\br, \bOmega)$                                   \\
+        \texttt{boundary\_coords}: $[N_{\text{bc}},2d]$   & 边界相空间坐标 $(\br^{\prime}, \bOmega^{\prime})$               \\
+        \texttt{boundary\_weights}: $[N_{\text{bc}}]$     & 边界求积权重 $\omega_i$                                        \\
+        \texttt{position\_coords}: $[N_{\text{mesh}},2d]$ & 系数采样网格点 $(\br^{\text{mesh}})$                            \\
+        \texttt{velocity\_coords}: $[N_{\text{quad}},2d]$ & 角度求积点 $\bOmega^{*}$                                      \\
+        \texttt{velocity\_weights}: $[N_{\text{quad}}]$   & 角度求积权重 $\omega_i$                                        \\
+        \texttt{boundary}: $[N_{\text{bc}}]$              & 边界入射强度 $I(\br^{\prime}, \bOmega^{\prime})$               \\
+        \texttt{mu}: $[N_{\text{mesh}},2]$                & 截面 $\mus(\br^{\text{mesh}})$ 与 $\mut(\br^{\text{mesh}})$ \\
+        \texttt{scattering\_kernel}: $[N_{\text{quad}}]$  & 散射核 $p(\bOmega, \bOmega^*)$                              \\
+        \bottomrule
+    \end{tabular}
+    \bicaption{DeepRTE 数据集特征。$N_\text{coords}$ 表示相空间采样点数，$N_\text{bc}$ 为边界采样点数，$N_\text{mesh}$ 为系数采样点数，$N_\text{quad}$ 为角度求积点数。}{DeepRTE features. $N_\text{coords}$ denotes the number of phase-space coordinates, $N_\text{bc}$ represents the number of boundary coordinates, $N_\text{mesh}$ corresponds to the number of coefficient coordinates, $N_\text{quad}$ specifies the number of velocity quadrature points.}\label{tab:rte_features}
+\end{table}
+
+在构造训练数据集时，每个样本包含：相空间坐标、入射边界函数 $I_-$、散射截面 $\mus$、总截面 $\mut$、相函数 $p$ 以及对应的辐射强度 $I$。这些物理量在理论上均为连续函数，在数值实现中则通过有限个离散采样点加以近似。表~\ref{tab:rte_features} 汇总了每个训练样本中包含的全部特征。
+
+\paragraph{无网格采样}
+训练数据集通过完全无网格（mesh-free）的随机采样生成。所有特征的采样数量 $N_{\text{coords}}$、$N_{\text{bc}}$、$N_{\text{mesh}}$ 与 $N_{\text{quad}}$ 彼此独立，可根据问题复杂度与计算资源灵活调整。这一设计避免了对固定网格的依赖，使模型更易迁移到不同几何与系数分布下。
+
+\subsection{Delta 函数训练数据集}
+
+由于 RTE 解算子相对于入射边界条件 $I_-$ 是线性的，任意实际边界条件都可以用若干 Delta 型源的线性组合近似。因此，我们将训练数据集专门构造成近似 Delta 函数的样本（例如采用高斯函数逼近），并利用解算子 $\mathcal{A}$ 与 DeepRTE 近似 $\ANN$ 关于 $I_-$ 的线性结构：一旦模型能够准确预测形如~\eqref{eq:rte-greens-function} 的 Delta 型入射条件，其对其他一般边界条件的外推能力便可通过线性叠加自然获得。
+
+在实现中，我们使用如下高斯型平滑核对边界 Dirac 源进行“钝化”处理：
+\begin{equation}
+    \zeta_\sigma(\br-\br', \bOmega-\bOmega') := \delta^{\sigma_{\br}}_{\{\br'\}}(\br)\delta^{\sigma_{\bOmega}}(\bOmega-\bOmega'),
+\end{equation}
+其中
+\begin{equation}\label{eq:delta_defination}
+    \delta_{\{\br'\}}^{\sigma}(\br) = \frac{1}{\sigma \sqrt{\pi}} \exp\left( -\frac{{(\br-\br')}^2}{\sigma^2} \right), \quad
+    \delta^{\sigma}(\bOmega-\bOmega') = \frac{1}{\sigma \sqrt{\pi}} \exp\left( -\frac{(\bOmega-\bOmega')^2}{\sigma^2} \right),
+\end{equation}
+并且 $(\br', \bOmega') \in \Gamma_-$。高斯核的尺度参数 $\sigma$ 控制 Delta 近似的尖锐程度，在数值稳定性与逼近精度之间起到权衡作用。
+
+% \todo: 此处需补充粒子法相关文献，~\cite{raviart1983analysis, chertock2017practical}
+受粒子法启发，我们将入射边界条件 $I_-$ 近似为若干 Dirac 分布（Delta 函数）的线性组合：
+\begin{equation}
+    I_{-}(\br, \bOmega) \approx I_{-}^{N_\text{bc}}(\br,\bOmega):=\sum_{i,j}^{N_\text{bc}} w_{ij}\,\delta_{\{\br_i\}}(\br)\,\delta(\bOmega-\bOmega_j), \quad (\br,\bOmega) \in \Gamma_{-},
+\end{equation}
+其中 $w_{ij}$ 为给定系数。该近似可以在测度意义下理解：对任意测试函数 $\phi\in C^0_0(\Gamma_-)$，内积 $(I_{-},\phi)$ 由下式近似：
+\begin{equation}
+    \int_{\Gamma_{-}} I_{-}(\br,\bOmega)\,\phi (\br,\bOmega) \,\mathrm{d}{\br} \,\mathrm{d}{\bOmega} \approx (I_{-}^{N_\text{bc}},\phi) = \sum_{i,j}^{N_\text{bc}} w_{ij}\,\phi(\br_i,\bOmega_j).
+\end{equation}
+因此，确定权重 $w_{ij}$ 的过程本质上等价于求解一个标准的数值求积问题。
+
+然而，上述粒子表示在关注解的点值时并不十分方便。为此，我们进一步将粒子函数 $I_{-}^{N_\text{bc}}$ 与一个连续函数 $I_{-,\sigma}^{N_\text{bc}}$ 联系起来，使其在更“经典”的意义下逼近边界数据 $I_{-}$。
+
+常见做法是将粒子解与光滑子（mollifier）$\zeta_\sigma$ 做卷积，从而得到一个平滑近似：
+\begin{equation}
+    I_{-}(\br, \bOmega) \approx I_{-,\sigma}(\br,\bOmega)
+    := (I_-*\zeta_\sigma)(\br, \bOmega)
+    = \int_{\Gamma_-} I_-(\br', \bOmega')\, \zeta_\sigma(\br-\br', \bOmega - \bOmega') \,\mathrm{d}{\br'}\,\mathrm{d}{\bOmega'},
+\end{equation}
+% \todo: 此处需补充光滑子性质的参考文献，~\cite{raviart1983analysis}
+其中 $\zeta_\sigma \in C^0(\Gamma_-)\cap L^1(\Gamma_-) $ 为满足相关分析结果的光滑子：
+\begin{equation}
+    \zeta_\sigma(\br, \bOmega):=\frac{1}{\sigma^{2d-1}}\zeta_{\sigma}\left(\frac{\br}{\sigma}, \frac{\bOmega}{\sigma}\right), \quad  \int_{\Gamma_{-}} \zeta_\sigma(\br,\bOmega) \,\mathrm{d}{\br} \,\mathrm{d}{\bOmega} = 1,
+\end{equation}
+其中 $\sigma$ 为核的特征长度。在本工作中，我们取
+\begin{equation}
+    \zeta_\sigma(\br-\br', \bOmega-\bOmega') := \zeta^{\sigma_{\br}}_{\{\br'\}}(\br)\,\zeta^{\sigma_{\bOmega}}(\bOmega-\bOmega'), \quad \sigma:=\max(\sigma_{\br},\sigma_{\bOmega}).
+\end{equation}
+据此，粒子近似可写为
+\begin{equation}\label{eq:particle-approx}
+    I_-(\br, \bOmega) \approx
+    I^{N_{\text{bc}}}_{-,\sigma}(\br,\bOmega)
+    := (I_-^{N_\text{bc}}*\zeta_\sigma)(\br, \bOmega)
+    = \sum_{i,j}^{N_\text{bc}} w_{ij}\,\zeta_\sigma(\br-\br_i,\bOmega-\bOmega_j),
+\end{equation}
+其中 $N_{\text{bc}}$ 为边界 $\Gamma_-$ 上的求积点数量。
+
+粒子方法的精度与核 $\zeta_\sigma$ 所保持的矩性质密切相关。若核满足如下阶数条件，则称其为阶数为 $k$ 的核：
+\begin{equation}\label{eq:order_k}
+    \left \{\begin{aligned}
+         & \int_{\Gamma_{-}} \zeta_\sigma(\br, \bOmega) \,\mathrm{d}{\br} \,\mathrm{d}{\bOmega} = 1,                                                                                                                     \\
+         & \int_{\Gamma_{-}} \br^{\alpha_i}\bOmega^{\alpha_j} \,\zeta_\sigma(\br, \bOmega) \,\mathrm{d}{\br} \,\mathrm{d}{\bOmega} = 0, \quad \text{对所有 }\alpha = \alpha_i + \alpha_j \text{ 且 } 1\leq |\alpha|\leq k-1, \\
+         & \int_{\Gamma_{-}} \left|(\br,\bOmega)^T\right|^k |\zeta_\sigma(\br, \bOmega)| \,\mathrm{d}{\br} \,\mathrm{d}{\bOmega} < \infty.
+    \end{aligned}\right.
+\end{equation}
+% \todo: 此处需补充粒子方法误差估计文献，如~\cite{chertock2017practical}
+根据已有的粒子方法误差分析结果，边界数据粒子近似的误差可由下述定理刻画。
+
+\begin{theorem}\label{thm:bc-error-estimate}
+    设条件~\eqref{eq:order_k} 对某个整数 $k\geq 1$ 成立，且核 $\zeta \in W^{m,p}(\Gamma_-)\cap W^{m,1}(\Gamma_-)$，其中整数 $m>d$。若 $I_- \in W^{l,p}(\Gamma_-)$，其中 $l=\max(k, m)$，则存在常数 $C>0$，使得
+    \begin{equation}\label{eq:bc_error_estimate}
+        \|I_- - I^{N_{\text{bc}}}_{-,\sigma}\|_{L^p(\Gamma_-)}\leq C\left\{ \sigma^k \,\|I_-\|_{k,p,\Gamma_-} + \left(\frac{h}{\sigma}\right)^m \,\|I_-\|_{m,p,\Gamma_-}\right\},
+    \end{equation}
+    其中 $h>0$ 表示覆盖 $\Gamma_-$ 的非重叠小立方体（或网格单元）的尺度。
+\end{theorem}
+
+上式中的两项分别对应于平滑误差和平面离散误差。通过适当选择 $\sigma$ 可在二者之间取得平衡：若 $\sigma$ 远小于粒子间最小距离，则近似函数仅在粒子 $\sigma$ 邻域内非零，会产生较大离散误差；反之，过大的 $\sigma$ 会带来显著的过度平滑误差。理论分析表明，常取 $\sigma\sim O(\sqrt{h})$ 以平衡两类误差，更多讨论可参考相关文献。
+% \todo: 此处需补充关于 $\sigma$ 选取的参考文献，~\cite{raviart1983analysis, chertock2017practical}
+
+在 Delta 函数训练数据集的构造中，我们选取一组以粒子点 $(\br_i, \bOmega_j)\in\Gamma_-$ 为中心、尺度 $(\sigma_{\br},\sigma_{\bOmega})\sim \Sigma$（服从某一给定分布）的核函数
+\begin{equation}
+    \Big\{\zeta_\sigma \;\Big|\; \zeta_\sigma(\br-\br_i, \bOmega-\bOmega_j)
+    = \zeta^{\sigma_{\br}}_{\{\br_i\}}(\br)\,\zeta^{\sigma_{\bOmega}}(\bOmega-\bOmega_j),\; i,j = 0,\ldots,N_{\text{bc}}-1\Big\},
+\end{equation}
+并用这些核函数作为训练时的典型边界条件。我们将对应的样本集合称为 \emph{Delta 函数训练数据集}。
+
+% \todo: 此处需补充神经网络万能逼近定理相关文献，~\cite{hornik1989multilayer, weinanpriori, weinan2019barron}
+根据神经网络的万能逼近性质，我们假定对上述 Delta 函数数据集，训练良好的算子近似 $\ANN_{\theta}$ 具有较小的泛化误差，即存在一组参数 $\theta^*$，使得
+\begin{equation}
+    \|\ANN_{\theta^*}\zeta_\sigma - \A\zeta_\sigma\|\leq \varepsilon, \quad \forall \zeta_\sigma \text{ 属于 Delta 函数测试数据集}.
+\end{equation}
+在此假设下，可以得到 DeepRTE 对任意边界条件 $I_-$ 的整体误差估计。
+
+\begin{theorem}\label{thm:error-estimate}
+    设给定的系数 $\mut$、$\mus$ 和 $p$ 满足定理~\ref{thm:existence-uniqueness-l2} 的假设，解算子 $\A$ 与神经网络算子 $\ANN$ 分别由~\eqref{eq:rte-op} 与~\eqref{eq:greens-integral-nn} 定义。对任意 $I_- \in L^2(\Gamma_-)$，令 $I^{N_{\text{bc}}}_{-,\sigma}$ 为粒子近似~\eqref{eq:particle-approx}。若存在参数集 $\theta^*$ 满足
+    \begin{equation}
+        \|\ANN_{\theta^*}\zeta_\sigma - \A\zeta_\sigma\|\leq \varepsilon, \quad \forall \zeta_\sigma \text{ 属于 Delta 函数测试数据集},
+    \end{equation}
+    则成立误差估计
+    \begin{equation}
+        \big\|\A^{\text{NN}}_{\theta^*} I_- - \A I_-\big\|_{L^2(D\times\sS^{d-1})}\leq C\left\{ \sigma^k \,\|I_-\|_{H^k(\Gamma_-)} + \left(\frac{h}{\sigma}\right)^m \,\|I_-\|_{H^m(\Gamma_-)} + \varepsilon\right\},
+    \end{equation}
+    其中 $C>0$ 为与 $I_-$ 无关的常数。
+\end{theorem}
+
+\begin{proof}
+    为简化记号，下文中记 $L^2:=L^2(D\times\sS^{d-1})$。首先注意到，由于 RTE 关于边界条件是线性的，解算子 $\A$ 显然为线性算子。另一方面，由~\eqref{eq:greens-integral-nn} 可直接验证 $\ANN_{\theta^*}$ 的线性性：对任意 $I_{-}^{(1)}, I_{-}^{(2)}\in L^2(\Gamma_-)$ 及实数 $\alpha,\beta$，有
+    \begin{equation}
+        \begin{aligned}
+            \ANN_{\theta^*}(\alpha I_{-}^{(1)} + \beta I_{-}^{(2)})
+             & =\int_{\Gamma_-} G^{\text{NN}}_{\theta^*}(\br, \bOmega; \br', \bOmega')\,\big(\alpha I_{-}^{(1)} + \beta I_{-}^{(2)}\big) \,\mathrm{d}{\br'} \,\mathrm{d}{\bOmega'}                                          \\
+             & =\alpha\int_{\Gamma_-} G^{\text{NN}}_{\theta^*} I_{-}^{(1)} \,\mathrm{d}{\br'} \,\mathrm{d}{\bOmega'} + \beta \int_{\Gamma_-} G^{\text{NN}}_{\theta^*} I_{-}^{(2)} \,\mathrm{d}{\br'} \,\mathrm{d}{\bOmega'} \\
+             & =\alpha \ANN_{\theta^*} I_{-}^{(1)} + \beta \ANN_{\theta^*} I_{-}^{(2)}.
+        \end{aligned}
+    \end{equation}
+
+    因此有
+    \begin{equation}\label{eq:error_estimate_split}
+        \|\ANN_{\theta^*} I_- - \mathcal{A} I_-\|_{L^2}
+        \leq \|\ANN_{\theta^*} (I_- - I^{N_{\text{bc}}}_{-,\sigma})\|_{L^2} + \|\mathcal{A} (I_- - I^{N_{\text{bc}}}_{-,\sigma})\|_{L^2} + \|\big(\ANN_{\theta^*} - \mathcal{A}\big) I^{N_{\text{bc}}}_{-,\sigma}\|_{L^2} .
+    \end{equation}
+
+    对于第一项，由于
+    \begin{equation}
+        \ANN_{\theta^*} I_{-} = \int_{\Gamma_-} G^{\text{NN}}_{\theta^*}(\br, \bOmega; \br', \bOmega') I_{-}(\br', \bOmega') \,\mathrm{d}{\br'} \,\mathrm{d}{\bOmega'},
+    \end{equation}
+    且网络 $G^{\text{NN}}_{\theta^*}$ 在紧致域 $\Gamma_-$ 与 $D \times \mathbb{S}^{d-1}$ 上连续，可得
+    \begin{equation}
+        \int_{D \times \mathbb{S}^{d-1}\times \Gamma_-} |G^{\text{NN}}_{\theta^*}|^2 \,\mathrm{d}{\br'} \,\mathrm{d}{\bOmega'} \,\mathrm{d}{\br} \,\mathrm{d}{\bOmega} < \infty,
+    \end{equation}
+    即 $\ANN_{\theta^*}$ 为 Hilbert–Schmidt 算子，因而作为线性算子是有界的，存在常数 $C_1$ 使得
+    \begin{equation}\label{eq:error_estimate_1_cn}
+        \|\ANN_{\theta^*} (I_- - I^{N_{\text{bc}}}_{-,\sigma})\|_{L^2} \leq C_1 \,\|I_- - I^{N_{\text{bc}}}_{-,\sigma}\|_{L^2(\Gamma_-)}.
+    \end{equation}
+
+    对于第二项，由定理~\ref{thm:existence-uniqueness-l2} 可得
+    \begin{equation}\label{eq:error_estimate_3_cn}
+        \|\mathcal{A} (I_- - I^{N_{\text{bc}}}_{-,\sigma})\|_{L^2} \leq C_2 \,\|I_- - I^{N_{\text{bc}}}_{-,\sigma}\|_{L^2(\Gamma_-)}.
+    \end{equation}
+
+    对第三项，由~\eqref{eq:particle-approx} 及 $\A$、$\ANN_{\theta^*}$ 的线性性，有
+    \begin{equation}\label{eq:error_estimate_2_cn}
+        \begin{aligned}
+            \|\big(\ANN_{\theta^*} - \mathcal{A}\big) I^{N_{\text{bc}}}_{-,\sigma}\|_{L^2}
+             & = \left\|\big(\ANN_{\theta^*} - \mathcal{A}\big) \sum_{i,j}^{N_{\text{bc}}} w_{ij}\,\zeta_\sigma\right\|_{L^2} \\
+             & \leq \sum_{i,j}^{N_{\text{bc}}} |w_{ij}|\, \|\big(\ANN_{\theta^*} - \mathcal{A}\big) \zeta_\sigma\|_{L^2}      \\
+             & \leq \varepsilon \sum_{i,j}^{N_{\text{bc}}} |w_{ij}| := C_3\varepsilon.
+        \end{aligned}
+    \end{equation}
+
+    将~\eqref{eq:error_estimate_1_cn}、~\eqref{eq:error_estimate_3_cn} 与~\eqref{eq:error_estimate_2_cn} 代入~\eqref{eq:error_estimate_split}，并结合定理~\ref{thm:bc-error-estimate} 给出的边界近似误差估计，即得
+    \begin{equation}
+        \begin{aligned}
+            \|\A^{\text{NN}}_{\theta^*} I_- - \A I_-\|_{L^2}
+             & \leq (C_1 + C_2)\, \|I_- - I^{N_{\text{bc}}}_{-,\sigma}\|_{L^2(\Gamma_-)} + C_3\varepsilon                                          \\
+             & \leq C\left\{ \sigma^k \,\|I_-\|_{H^k(\Gamma_-)} + \left(\frac{h}{\sigma}\right)^m \,\|I_-\|_{H^m(\Gamma_-)} + \varepsilon\right\},
+        \end{aligned}
+    \end{equation}
+    其中常数 $C$ 与 $I_-$ 无关。证毕。
+\end{proof}
+
+\subsection{损失函数与优化}
+
+训练过程中使用的基本损失函数为预测强度 $I^{\text{NN}}_{\bm{\theta}}$ 与真值 $I$ 之间的均方误差（MSE）：
+\begin{equation}\label{eq:mse}
+    \ell(I^\text{NN}_{\bm{\theta}}, I)= \frac{1}{N_\text{coords}}\sum_{i=1}^{N_{\text{coords}}} \left| I^{\text{NN}}_{\bm{\theta}}(\br_i,\bOmega_i) - I(\br_i, \bOmega_i) \right|^2,
+\end{equation}
+整体损失函数为所有样本损失的平均值：
+\begin{equation}\label{eq:loss}
+    \mathcal{L}(\bm{\theta}) = \frac{1}{N}\sum_{n=1}^N \ell(I^\text{NN}_{\bm{\theta},n}, I_n),
+\end{equation}
+其中 $N_{\text{coords}}$ 为相空间采样点数，$N$ 为训练样本数。
+
+为了在训练中节省计算成本，我们借鉴随机梯度下降（SGD）的思想，在每一次梯度更新中仅在相空间中随机选取 $N_\text{col}$ 个 collocation 点来估计损失：
+\begin{equation}\label{eq:collocation_points}
+    \ell(I^\text{NN}_{\bm{\theta}}, I)= \frac{1}{N_\text{col}}\sum_{i=1}^{N_{\text{col}}} \left| I^{\text{NN}}_{\bm{\theta}}(\br_i,\bOmega_i) - I(\br_i, \bOmega_i) \right|^2.
+\end{equation}
+
+训练神经网络的目标是最小化上述损失函数：
+\begin{equation}
+    \min_{\bm{\theta}} \mathcal{L}(\bm{\theta}),
+\end{equation}
+这一优化问题通常通过随机梯度下降（SGD）及其改进方法（如 Adam）求解。
+% \todo: 此处需补充优化算法相关文献，例如 SGD/Adam 的原始论文
+\subsection{精度指标与模型评估}
+
+在 RTE 的许多应用中，角度积分后的能量密度是最常用、也最直观的评估量。密度由强度 $I(\br,\bOmega)$ 在单位球面 $\sS^{d-1}$ 上积分得到，其定义为
+\begin{equation}\label{eq:density}
+    \Phi(\br) = \frac{1}{S^{d-1}}\int_{\sS^{d-1}} I(\br, \bOmega) \,\mathrm{d}{\bOmega}.
+\end{equation}
+
+在训练阶段，我们直接以 $I(\br,\bOmega)$ 的 MSE（见~\eqref{eq:loss}）作为优化目标；而在测试与评估阶段，我们主要关注由 $I$ 推导得到的密度误差。具体而言，密度的均方误差定义为
+\begin{equation}
+    \text{MSE} = \frac{1}{N_{\text{mesh}}}\sum_{i=1}^{N_{\text{mesh}}} \big| \Phi^{\text{NN}}(\br_i) - \Phi(\br_i) \big|^2.
+\end{equation}
+
+此外，我们还采用相对误差指标来衡量整体精度，即均方根百分比误差（RMSPE）：
+\begin{equation}
+    \text{RMSPE} = \sqrt{\frac{\displaystyle\sum^{N_{\text{mesh}}}_{i=1} |\Phi^{\text{NN}}(\br_i) - \Phi(\br_i)|^2}{\displaystyle\sum^{N_{\text{mesh}}}_{i=1}|\Phi(\br_i)|^2}}\times 100\%.
+\end{equation}
+该指标在不同算例和系数分布之间具有良好的可比性，因而被用于本文所有数值实验的统一评估标准。
