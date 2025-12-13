@@ -1,0 +1,210 @@
+\section{算子验证}\label{sec:ablation-study}
+
+DeepRTE 的架构设计旨在通过将 RTE 解算子分解为模拟沿特征线传输的衰减分量（算子 $\J$ 和 $\cL$）以及捕捉散射行为的散射分量（$\cS$），从而反映 RTE 解的数学结构，如第~\ref{sec:architecture} 节所述。
+每个分量在 DeepRTE 中都通过独特的神经模块实现：衰减模块（第~\ref{sec:attenuation-module} 节）和散射模块（第~\ref{sec:scattering-module} 节）。
+为了验证这一设计选择，我们进行了精心设计的数值实验，以评估每个学习到的分量是否直接对应于其解析形式。
+作为对照，我们还将 DeepRTE 与不包含任何 RTE 特定归纳偏置的基线模型进行了比较。
+
+我们将 DeepRTE 与多输入算子（Multi-Input Operator, MIO）~\todo[inline]{jin2022mionet}（一种源自 DeepONet 的算子学习框架，可接受多个输入函数）作为基线模型进行比较，后者采用整体架构，未针对 RTE 进行专门设计。我们选择 MIO 作为基线的原因如下：
+\begin{itemize}
+    \item MIO 是最常用的能够处理多函数输入的算子学习框架之一，使其适合学习依赖于多个输入函数（$I_-$、$\mut$、$\mus$ 和 $p$）的 RTE 解算子。
+    \item 在给定足够的训练数据和网络容量的情况下，MIO（DeepONet）理论上可以逼近任何连续算子，包括 RTE 解算子~\todo[inline]{lu2021learning}。
+    \item MIO 不包含任何针对 RTE 的物理信息归纳偏置，这使我们能够分离出反映 RTE 数学结构的 DeepRTE 架构的影响。
+\end{itemize}
+虽然 FNO~\todo[inline]{li2020fourier} 是另一个潜在的基线，但由于几个基本限制，它不适合此任务：
+\begin{itemize}
+    \item FNO 旨在学习将规则网格上的函数映射到同一网格上的函数的算子，这与 RTE 处理角度变量和复杂边界条件的要求不符。
+    \item FNO 依赖傅里叶变换来捕捉全局（非局部）信息，但这种方法在高维 RTE 解空间（空间和角度维度）中面临重大挑战，导致计算和内存成本过高。在我们的初步测试中，这些成本使得在我们的计算预算内训练 FNO 变得不可行。
+    \item RTE 在涉及空间和角度变量的相空间上运行，而 FNO 通常仅适用于空间域。调整 FNO 以处理角度依赖性需要进行非平凡的修改（例如，确定是否在角度域中应用傅里叶变换），这并不直接，并且对于此特定问题可能无效。
+\end{itemize}
+
+基于这些原因，我们将比较重点放在作为基线模型的 MIO 上。我们首先通过消融实验验证 DeepRTE 中衰减和散射模块的有效性。然后，我们在 RTE 解算子学习任务上比较 DeepRTE 与 MIO 的整体性能。
+
+\subsection{衰减模块的消融实验}
+
+衰减模块模拟不带散射效应的 RTE 传输行为。
+这种行为由两个关键过程表征：通过总截面 $\mut$ 的边界条件衰减（算子 $\J$，方程~\eqref{eq:attenuation-op}）和通过散射截面 $\mus$ 的体源衰减（提升算子 $\mathcal{L}$，方程~\eqref{eq:lifting-op}）。
+
+根本挑战在于，解算子 $\A$ 对 $\mus$ 和 $\mut$ 的依赖既是非线性的，又表现出\emph{仅沿特征线的非局部行为}。
+像 MIO 这样的传统架构仅通过分支网络和与主干网络的内积来捕捉一般的非局部依赖性，随着空间和角度维度的增加，这在计算上变得昂贵。更关键的是，这种方法无法准确捕捉 RTE 基于特征线的衰减行为，并且可能无法有效地泛化。
+
+相比之下，DeepRTE 包含一个专门的衰减模块，通过精心设计的注意力机制显式地模拟沿特征线（无论问题维度如何，特征线保持一维）的这种非局部依赖性，详见第~\ref{sec:attenuation-module} 节。
+为了验证这种物理信息设计的有效性，我们进行了两个针对性实验：一个检查衰减算子 $\J$，另一个关注提升算子 $\cL$。
+
+\textbf{1. 算子 $\J$ 的消融实验。}
+我们通过考虑由~\eqref{eq:rte-sweep} 控制的无散射纯衰减场景来隔离衰减算子 $\J$：
+\begin{equation}
+    \left\{ % tex-fmt: skip
+    \begin{aligned}
+        \bOmega \cdot \nabla J_b + \mut J_b & = 0,     \\
+        J_b|_{\Gamma_{-}}                   & = I_{-},
+    \end{aligned}
+    \right. % tex-fmt: skip
+\end{equation}
+其解析形式为~\eqref{eq:attenuation-op}：
+\begin{equation}
+    \J: (I_{-}; \mut) \mapsto J_b = e^{-\tau_{\br,\bOmega}(0,s_{-}(\br,\bOmega))} I_{-}\left(\br-s_{-}(\br, \bOmega)
+    \bOmega, \bOmega\right).
+\end{equation}
+
+根据我们在第~\ref{sec:attenuation-module} 节中的架构设计，我们使用衰减模块来学习近似 $\J$ 的映射 $\J^{\text{NN}}$，如下所示：
+\begin{equation}
+    J_b(\br,\bOmega) \approx \J^{\text{NN}}I_{-} := \int_{\Gamma_{-}} G^{\text{NN}}_{\J}(\br,\bOmega, \br',\bOmega'; \mut) I_-(\br',\bOmega')\diff{\br'}\diff{\bOmega'},
+\end{equation}
+其中 $G^{\text{NN}}_{\J}$ 类似于一般衰减格林函数~\eqref{G_equation}，但简化为仅依赖于~\eqref{eq:optical-depth-net} 中定义的 $\tau^{\text{NN}}_{-,t}$。由于衰减算子 $\J$ 仅依赖于 $\mut$（而不依赖于 $\mus$），我们公式化为：
+\begin{equation}
+    G_{\J}^{\text{NN}}(\br,\bOmega, \br', \bOmega';\mut) = \text{MLP}(\br,\bOmega, \br', \bOmega', \tau^{\text{NN}}_{-,t}) \in \mathbb{R}^1.
+\end{equation}
+
+在我们的数值实验中，我们通过移除所有与散射相关的组件来实现这一点：我们将散射块的数量设置为 $N_\ell = 0$，并将 $\mu$ 的维度从 $2$ 减少到 $1$，从而有效地禁用了依赖于 $\mu_s$ 的注意力机制。
+
+为了验证我们的架构确实捕捉到了衰减效应，我们将它与没有任何 RTE 专用架构的 MIO 进行比较。我们这里使用的 MIO 网络是非常标准的，见~\todo[inline]{jin2022mionet}：
+\begin{equation}
+    J_b(\br,\bOmega) \approx \text{MIO}_{\J}(\mut,I_{-}) := (\text{MLP}^{\text{branch}}_1(\mut)\odot\text{MLP}^{\text{branch}}_2(I_-))\cdot \text{MLP}^{\text{trunk}}(\br,\bOmega).
+\end{equation}
+
+对于数据集构建，除了 $\mus$ 和 $g$ 之外，所有其他设置保持不变（见表~\ref{tab:dataset}）。我们使用与第~\ref{sec:dataset-construction} 节相同的数值求解器，除了我们将 $\mus = 0$ 以禁用散射，并将 $g$ 设置为无关（不使用）。
+按照这些设置，我们生成了 $1000$ 个样本用于训练，以及 $100$ 个独立同分布（i.i.d.）样本用于测试。
+
+\textbf{2. 算子 $\cL$ 的消融实验。} 与 $\J$ 类似，我们通过考虑由~\eqref{eq:lifting} 控制的无边界流入的纯提升场景来隔离提升算子 $\cL$：
+\begin{equation}
+    (\bOmega\cdot\nabla + \mut)J = \mus I, \quad  J|_{\Gamma_{-}} = 0,
+\end{equation}
+其解析形式由~\eqref{eq:lifting-op} 给出：
+\begin{equation}
+    \cL:(I;\mus,\mut) \mapsto J = \int_0^{s_{-}(\br, \bOmega)} e^{-\tau_{\br,\bOmega}(0,s)}\mus(\br-s\bOmega)I(\br-s\bOmega, \bOmega)\diff{s}.
+\end{equation}
+
+根据我们在第~\ref{sec:attenuation-module} 节中的架构设计，我们使用衰减模块来学习近似 $\cL$ 的映射 $\cL^{\text{NN}}$，如下所示：
+\begin{equation}
+    J(\br,\bOmega) \approx \cL^{\text{NN}}I := \int_{D\times\sS^{d-1}}
+    G_{\cL}^{\text{NN}}(\br,\bOmega,\br',\bOmega';\mut,\mus)I(\br',\bOmega')\diff{\br'}\diff{\bOmega'},
+\end{equation}
+其中 $G^{\text{NN}}_{\cL}$ 是衰减格林函数~\eqref{G_equation}。由于提升算子 $\cL$ 依赖于 $\mut$ 和 $\mus$，根据~\eqref{G_equation} 我们公式化为：
+\begin{equation}
+    G_{\cL}^{\text{NN}}(\br,\bOmega, \br', \bOmega';\mut,\mus) = \bG^{\text{NN}}(\br,\bOmega, \br', \bOmega', \tau^{\text{NN}}_{-})\bm{W}\in\mathbb{R}^1,
+\end{equation}
+其中 $\tau^{\text{NN}}_{-}$ 在算法~\ref{alg:optical-depth-net} 中定义，另见注~\ref{rmk:optical-depth-encoding}。$\bG^{\text{NN}}$ 的输出维度为 $d_\text{model}$，$\bm{W} \in \mathbb{R}^{d_{\text{model}}\times 1}$ 是一个可学习的权重矩阵，用于将输出投影到单个输出通道，类似于~\eqref{scattering_layer} 中的 $\bm{W}$。
+
+与 $\J$ 类似，我们将它与没有任何 RTE 专用架构的 $\text{MIO}_{\cL}$ 进行比较：
+\begin{equation}
+    J(\br,\bOmega) \approx \text{MIO}_{\cL}(\mut,\mus;I) := (\text{MLP}^{\text{branch}}_1(\mut)\odot\text{MLP}^{\text{branch}}_2(\mus)\odot\text{MLP}^{\text{branch}}_3(I))\cdot \text{MLP}^{\text{trunk}}(\br,\bOmega).
+\end{equation}
+
+对于数据集构建，除了 $g$（不需要）和边界条件 $I_- = 0$（设置为 0）之外，所有其他设置保持不变（见表~\ref{tab:dataset}）。
+对于源项 $I(\br,\bOmega)$，我们使用谱合成方法~\todo[inline]{liu2019advances, ruan1998efficient} 在频域中生成二维高斯随机场。
+我们使用与第~\ref{sec:dataset-construction} 节相同的数值求解器，除了我们将散射替换为 $\mus I$。
+按照这些设置，我们生成了 $1000$ 个样本用于训练，以及 $100$ 个独立同分布样本用于测试。
+
+\textbf{结果。} 表~\ref{tab:j_l_compare} 中的结果表明，我们的衰减模块 $\J^{\text{NN}}$ 和 $\cL^{\text{NN}}$ 在所有指标上都大幅优于 $\text{MIO}_{\J}$ 和 $\text{MIO}_\cL$。具体而言，$\J^{\text{NN}}$ 和 $\cL^{\text{NN}}$ 在训练和测试 MSE 上都实现了一个数量级以上的改进，同时参数量减少了 $34$ 倍（$37,282$ 对 $4956160$ 以及 $139,362$ 对 $4,792,320$）。测试 RMSPE 从 MIO 的 $44.251\%$、$25.350\%$ 降低到我们方法的 $2.339\%$、$1.327\%$。这种巨大的性能差异验证了我们的衰减模块设计有效地捕捉了算子 $\J$ 和 $\cL$ 固有的基于特征线的传输行为，而通用的 MIO 架构无法有效地学习这种专门的映射。
+\begin{table}
+    \centering
+    \begin{tabular}{@{}cccccccc@{}}
+        \toprule
+        \multirow{2}{*}{算子}    & \multirow{2}{*}{模型}   & \multirow{2}{*}{参数量} & \multicolumn{3}{c}{训练} & \multicolumn{2}{c}{评估}                                                 \\
+        \cmidrule(l){4-6} \cmidrule(l){7-8}
+                               &                       &                      & MSE                    & RMSPE (\%)             & Epochs  & MSE                    & RMSPE (\%) \\
+        \midrule
+        \multirow{2}{*}{$\J$}  & Our $\J^{\text{NN}}$  & 37,282               & $3.631\times 10^{-7}$  & 2.78                   & 200,000 & $4.561 \times 10^{-8}$ & 2.339      \\
+                               & $\text{MIO}_{\J}$     & 4,956,160            & $1.983\times 10^{-6}$  & 6.459                  & 200,000 & $1.088 \times 10^{-4}$ & 44.251     \\
+        \midrule
+        \multirow{2}{*}{$\cL$} & Our $\cL^{\text{NN}}$ & 139,362              & $9.682 \times 10^{-6}$ & 0.909                  & 200,000 & $3.359 \times 10^{-5}$ & 1.327      \\
+                               & $\text{MIO}_{\cL}$    & 4,792,320            & $8.528 \times 10^{-4}$ & 8.565                  & 200,000 & $1.224 \times 10^{-2}$ & 25.350     \\
+        \bottomrule
+    \end{tabular}
+    \bicaption{衰减模块的消融实验。$\J$ 和 $\cL$ 算子的训练和评估结果，与 MIO（无任何 RTE 专用架构）进行对比。}{Ablation study of attenuation module. Training and evaluation of $\J$ and $\cL$ operators comparied to MIO (without any RTE specialized architecture) .}\label{tab:j_l_compare}
+\end{table}
+
+\subsection{散射模块的消融实验}
+
+为了检验散射算子 $\cS$（方程~\ref{eq:scattering-op}）的必要性，我们采用反证法。我们假设 $\cS$ 是不必要的，并通过用等大小的多层感知机替换散射层（实现 $\cS$ 的组件）来测试这一点。
+我们将此修改后的架构表示为 $\ANN_{\text{w/o }\cS}$。
+
+$\ANN_{\text{w/o }\cS}$ 与完整 DeepRTE $\ANN$ 之间的唯一区别在于散射块的实现。我们不使用方程~\ref{scattering_layer}，而是禁用散射算子 $S^\top$：
+\begin{equation}
+    \text{ScatteringBlock}_\ell(\bm{G}) = \text{LayerNorm}\Big(\sigma\Big(\bm{W}^{\ell} \bm{G} + \bm{b}^{\ell}\Big)\Big),
+\end{equation}
+其中不涉及散射算子 $\cS$，$\bm{W}^{\ell}$ 和 $\bm{b}^{\ell}$ 是 MLP 的可学习参数。此 MLP 中的参数数量保持与原始散射块大致相等，以确保公平比较。
+
+数据集和训练设置与原始 DeepRTE 相同（见第~\ref{sec:acc} 节）。为了评估模型在不同各向异性条件下的性能，训练集中的参数 $g$ 从 $0$ 到 $0.9$ 均匀采样。除了这个 $g$ 之外，$\text{DeepRTE}_{\cS}$ 的训练集使用与原始 DeepRTE 模型相同的配置。对于测试，我们在相同的三个散射区间~\ref{li:regimes} 上进行测试。
+
+如果我们的假设是正确的，那么这个修改后的模型将成功拟合训练数据，并获得与原始 DeepRTE 相当的测试性能。相反，糟糕的训练拟合和巨大的测试误差将反驳我们的假设，并证明散射算子 $\cS$ 的必要性。表~\ref{tab:ablation_g} 中展示的实验结果有力地支持了后一种结论。请注意 $\ANN_{\text{w/o }\cS}$ 在散射高度前向峰值（强各向异性）的数据集上的糟糕表现。与完整 DeepRTE 模型相比，这种性能的显著下降清楚地表明，散射算子 $\cS$ 对于准确模拟 RTE 解算子至关重要。
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{@{}lcccc@{}}
+        \toprule
+        模型                                            & 散射区间   & $g$ 范围      & MSE                    & RMSPE (\%) \\
+        \midrule
+        \multirow{3}{*}{无散射: $\ANN_{\text{w/o }\cS}$} & 近各向同性  & $(0,\,0.2)$ & $2.657\times10^{-2}$   & $8.251$    \\
+                                                      & 中度各向异性 & $(0.4,0.6)$ & $6.852\times10^{-2}$   & $11.395$   \\
+                                                      & 高度前向峰值 & $(0.7,0.9)$ & $7.257\times10^{-2}$   & $13.108$   \\
+        \midrule
+        \multirow{3}{*}{有散射: $\ANN$}                  & 近各向同性  & $(0,\,0.2)$ & $1.065 \times 10^{-3}$ & 2.383      \\
+                                                      & 中度各向异性 & $(0.4,0.6)$ & $1.127 \times 10^{-3}$ & 2.452      \\
+                                                      & 高度前向峰值 & $(0.7,0.9)$ & $1.853 \times 10^{-3}$ & 3.069      \\
+        \bottomrule
+    \end{tabular}
+    \bicaption{不同散射各向异性区间（Heney–Greenstein 参数 $g$）下的性能表现。}{Performance across scattering anisotropy regimes (Heney–Greenstein parameter $g$).}
+    \label{tab:ablation_g}
+\end{table}
+
+
+我们注意到，在我们的 DeepRTE 模型中，提升算子 $\cL$~\eqref{eq:lifting-op} 同时出现在衰减模块（见~\eqref{eq:L-op}，且由于 $\mus$ 包含在 $\tau_{-}^{\text{NN}}$ 中，见注~\ref{rmk:optical-depth-encoding}）和散射模块（见~\eqref{eq:scattering-mus}）中。这一设计选择反映了我们基于数学域分离操作的架构原则：衰减模块处理沿特征线作用于空间变量的算子（由注意力机制捕捉），而散射模块处理作用于角度变量的算子（由角度积分捕捉）。这种分离简化了模型架构，并通过重复模块化块促进了可扩展性。
+
+
+\subsection{与 MIO 的整体对比}
+
+为了评估 MIO 的泛化性能，我们在散射核参数 $g$ 均匀分布在 $[0, 0.2]$ 范围内的数据集上对其进行了训练。此训练数据集与用于 DeepRTE 的数据集相同，以确保公平比较。
+此外，我们将 MIO 的规模从小变大，以检查不同的 MIO 配置如何影响训练和验证数据集上的结果。比较结果如表~\ref{compare_table} 所示。
+
+\begin{table}
+    \centering
+    \begin{tabular}{@{}llccccc@{}}
+        \toprule
+        \multirow{2}{*}{模型}                      &
+        \multirow{2}{*}{参数量}                     &
+        \multicolumn{3}{c}{训练数据集}                &
+        \multicolumn{2}{c}{评估数据集}
+        \\ \cmidrule(l){3-7}
+                                                 &                            &
+        \begin{tabular}[c]{@{}c@{}}MSE
+        \end{tabular}           &
+        \begin{tabular}[c]{@{}c@{}}RMSPE \\ (\%)
+        \end{tabular} & \multicolumn{1}{l}{Epochs} &
+        \begin{tabular}[c]{@{}c@{}}MSE
+        \end{tabular}           &
+        \begin{tabular}[c]{@{}c@{}}RMSPE \\ (\%)
+        \end{tabular}                                              \\ \midrule
+        \multicolumn{1}{c}{\multirow{3}{*}{MIO}} &
+        \multicolumn{1}{c}{244960}               & $1.690\times 10^{-4}$
+                                                 & $65.60\%$
+                                                 & 100000                     & $1.984\times
+        10^{-4}$                                 & $72.49\%$
+        \\
+        \multicolumn{1}{c}{}                     &
+        \multicolumn{1}{c}{\num{4351744}}        & $4.119\times 10^{-6}$
+                                                 & $10.57\%$
+                                                 & 100000                     & $1.319\times
+        10^{-4}$                                 & $59.09\%$
+        \\
+        \multicolumn{1}{c}{}                     &
+        \multicolumn{1}{c}{8171520}              & $2.140\times 10^{-6}$
+                                                 & $7.58\%$
+                                                 & 100000                     & $9.912\times
+        10^{-5}$                                 & $51.23\%$
+        \\ \midrule
+        DeepRTE                                  &
+        \multicolumn{1}{c}{37954}                & $8.210 \times
+        10^{-9}$                                 & $3.16\%$
+                                                 & 5000                       &
+        $5.630 \times 10^{-10}$                  & $2.83\%$
+        %  \\ \multicolumn{1}{l}{}                                &
+        % \multicolumn{1}{l}{}
+        \\ \bottomrule
+    \end{tabular}
+    \bicaption{MIO 和 DeepRTE 框架在辐射传输方程求解上的性能比较。MIO 结果展示了三种不同的参数配置，而 DeepRTE 以显著更少的参数和训练轮数实现了更高的精度。}{Performance comparison between MIO and DeepRTE frameworks on radiation transport equation solving. MIO results are shown for three different parameter configurations, while DeepRTE achieves superior accuracy with significantly fewer parameters and training epochs.}\label{compare_table}
+\end{table}
+
+比较表明，虽然 MIO 在训练数据集上的性能随着参数的增加而提高，但它在从与训练集相同分布采样的验证数据集上仍然存在显著误差。这一观察结果突显了 MIO 有限的泛化能力，尽管它能够很好地拟合训练数据。即使经过广泛的参数调整，MIO 仍然难以准确预测来自与训练集相同分布的未见输入的解函数，并且未能捕捉控制 RTE 的潜在物理原理。
+
+相比之下，DeepRTE 的架构使其能够很好地泛化到未见输入，无论是在相同分布内还是在零样本设置中。通过在衰减和散射模块以及格林函数积分中直接包含物理信息，DeepRTE 利用 RTE 的基本结构进行准确预测。这种超越训练数据的泛化能力对于实际应用非常重要。
