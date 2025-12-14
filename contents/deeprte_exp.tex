@@ -37,8 +37,7 @@
 
 \subsection{数据集构造}\label{sec:dataset-construction}
 
-训练集与测试集均由传统数值方法生成，主要采用扫掠法（sweeping method）。
-\todo[inline]{~\cite{koch1991solution,zeyao2004parallel}}
+训练集与测试集均由传统数值方法生成，主要采用扫掠法（sweeping method）~\cite{koch1991solution,zeyao2004parallel}。
 相应的 MATLAB 与 Python 实现已开源于 \href{https://github.com/mazhengcn/rte-dataset}{rte-dataset} 仓库，便于复现实验与进行进一步比较。
 
 \paragraph{计算区域与离散}
@@ -130,26 +129,26 @@
     \centering
     \begin{tabular}{lp{0.3\textwidth}ll}
         \toprule
-        类别                                         & 参数                                            & 符号                       & 取值/范围                                \\ \midrule
-        \multirow{2}{*}{空间区域（Spatial domain）}      & 计算区域（Domain）                                  & $D$                      & ${[0,1]}^2$                          \\
-                                                   & 子区域（Subdomain）                                & $D_\mu$                  & ${[0.4,0.6]}^2$                      \\
+        类别                    & 参数                       & 符号                       & 取值/范围                                \\ \midrule
+        \multirow{2}{*}{空间区域} & 计算区域                     & $D$                      & ${[0,1]}^2$                          \\
+                              & 子区域                      & $D_\mu$                  & ${[0.4,0.6]}^2$                      \\
         \midrule
-        \multirow{4}{*}{截面系数（Cross section）}       & \multirow{2}{*}{总截面（Total）}                   & \multirow{2}{*}{$\mut$}  & $D_\mu$ 内：$\mathcal{U}(5,7)$         \\
-                                                   &                                               &                          & $D\backslash D_\mu$ 内：$10$           \\
-                                                   & \multirow{2}{*}{散射截面（Scattering）}             & \multirow{2}{*}{$\mus$}  & $D_\mu$ 内：$\mathcal{U}(2,4)$         \\
-                                                   &                                               &                          & $D\backslash D_\mu$ 内：$5$            \\
+        \multirow{4}{*}{截面系数} & \multirow{2}{*}{总截面}     & \multirow{2}{*}{$\mut$}  & $D_\mu$ 内：$\mathcal{U}(5,7)$         \\
+                              &                          &                          & $D\backslash D_\mu$ 内：$10$           \\
+                              & \multirow{2}{*}{散射截面}    & \multirow{2}{*}{$\mus$}  & $D_\mu$ 内：$\mathcal{U}(2,4)$         \\
+                              &                          &                          & $D\backslash D_\mu$ 内：$5$            \\
         \midrule
-        \multirow{2}{*}{离散化（Discretization）}       & 空间网格点数（\# of mesh points）                     & $N_{\text{mesh}}$        & 40                                   \\
-                                                   & 角度求积点数（\# of angular quadrature points）       & $N_\text{quad}$          & 24                                   \\ \midrule
-        \multirow{5}{*}{边界条件（Boundary conditions）} & 光束空间中心坐标（Beam spatial centers）                & $y_l', y_r', x_b', x_t'$ & 从网格点中随机采样                            \\
-                                                   & \multirow{2}{*}{光束角度求积点（Beam angular points）} & $c_l', c_r', c_b', c_t'$ & \multirow{2}{*}{从角度求积点中随机采样}         \\
-                                                   &                                               & $s_l', s_r', s_b', s_t'$ &                                      \\
-                                                   & 光束空间标准差（Beam spatial std dev）                 & $\sigma_{\br}$           & $\sqrt{2}\,\mathcal{U}(0.005, 0.02)$ \\
-                                                   & 光束角度标准差（Beam angular std dev）                 & $\sigma_{\bOmega}$       & $\sqrt{2}\,\mathcal{U}(0.005, 0.01)$ \\
+        \multirow{2}{*}{离散化}  & 空间网格点数                   & $N_{\text{mesh}}$        & 40                                   \\
+                              & 角度求积点数                   & $N_\text{quad}$          & 24                                   \\ \midrule
+        \multirow{5}{*}{边界条件} & 光束空间中心坐标                 & $y_l', y_r', x_b', x_t'$ & 从网格点中随机采样                            \\
+                              & \multirow{2}{*}{光束角度求积点} & $c_l', c_r', c_b', c_t'$ & \multirow{2}{*}{从角度求积点中随机采样}         \\
+                              &                          & $s_l', s_r', s_b', s_t'$ &                                      \\
+                              & 光束空间标准差                  & $\sigma_{\br}$           & $\sqrt{2}\,\mathcal{U}(0.005, 0.02)$ \\
+                              & 光束角度标准差                  & $\sigma_{\bOmega}$       & $\sqrt{2}\,\mathcal{U}(0.005, 0.01)$ \\
         \midrule
-        \multirow{3}{*}{散射参数（Scattering）}          & \multirow{3}{*}{不对称参数（Asymmetry parameter）}   & \multirow{3}{*}{$g$}     & $\mathcal{U}(0,0.2)$                 \\
-                                                   &                                               &                          & $\mathcal{U}(0.4,0.6)$               \\
-                                                   &                                               &                          & $\mathcal{U}(0.7,0.9)$               \\
+        \multirow{3}{*}{散射参数} & \multirow{3}{*}{不对称参数}   & \multirow{3}{*}{$g$}     & $\mathcal{U}(0,0.2)$                 \\
+                              &                          &                          & $\mathcal{U}(0.4,0.6)$               \\
+                              &                          &                          & $\mathcal{U}(0.7,0.9)$               \\
         \bottomrule
     \end{tabular}
     \bicaption{数据集构造中使用的超参数汇总。表中给出了计算区域、截面系数、离散参数、边界条件以及散射参数等设置。}{Summary of hyperparameters for dataset construction. This table details the computational domain, cross sections, discretization, boundary conditions, and other parameters used.}\label{tab:dataset}
@@ -205,8 +204,9 @@ DeepRTE 的网络超参数列于表~\ref{tab:parameters}。网络由衰减模块
     \bicaption{DeepRTE 网络超参数。网络由衰减模块与散射模块两部分构成，表中给出了层数、隐含维度、输出维度、多头数、键/值维度以及潜在特征维度等。}{DeepRTE network hyperparameters. The network consists of two modules: the attenuation module and the scattering module. The hyperparameters include the number of layers, hidden dimensions, output dimensions, number of heads, key dimensions, value dimensions, and latent dimensions.}\label{tab:parameters}
 \end{table}
 
-\subsection{结果分析}
-\subsubsection{精度验证}
+
+\section{数值实验}
+\subsection{精度验证}
 \label{sec:acc}
 
 本小节评估 DeepRTE 的数值精度与计算效率。精度指标采用预测结果与真值之间的均方误差（MSE）以及均方根百分比误差（RMSPE）。所有结果均基于与训练集分布一致的验证数据集。
@@ -215,10 +215,10 @@ DeepRTE 的网络超参数列于表~\ref{tab:parameters}。网络由衰减模块
     \centering
     \begin{tabular}{@{}cccccc@{}}
         \toprule
-        模型（Model）                & 参数量（\# of parameters）  & 散射区间（Scattering regime）       & $g$ 取值范围   & MSE ($\times 10^{-10}$) & RMSPE (\%) \\ \midrule
-        \multirow{3}{*}{DeepRTE} & \multirow{3}{*}{37954} & 近各向同性（Near isotropy）          & (0, 0.2)   & 5.630                   & 2.827      \\ \cmidrule(l){3-6}
-                                 &                        & 中度各向异性（Moderate anisotropy）   & (0.4, 0.6) & 5.453                   & 2.759      \\ \cmidrule(l){3-6}
-                                 &                        & 强前向散射（Highly forward peaking） & (0.7, 0.9) & 7.223                   & 3.181      \\ \bottomrule
+        模型                       & 参数量                    & 散射区间   & $g$ 取值范围   & MSE ($\times 10^{-10}$) & RMSPE (\%) \\ \midrule
+        \multirow{3}{*}{DeepRTE} & \multirow{3}{*}{37954} & 近各向同性  & (0, 0.2)   & 5.630                   & 2.827      \\ \cmidrule(l){3-6}
+                                 &                        & 中度各向异性 & (0.4, 0.6) & 5.453                   & 2.759      \\ \cmidrule(l){3-6}
+                                 &                        & 强前向散射  & (0.7, 0.9) & 7.223                   & 3.181      \\ \bottomrule
     \end{tabular}
     \bicaption{DeepRTE 在三种散射区间上的精度指标。所有验证样本与训练集分布一致，表中给出了各区间上的 MSE 与 RMSPE，均表现出较高精度。}{Accuracy validation of DeepRTE model across three distinct scattering regimes. All validation experiments were conducted on a dataset sharing the same distribution as the training dataset. The table demonstrates that the model achieves high accuracy with RMSPE consistently below 3.2\% across all regimes.}\label{tab:accuracy}
 \end{table}
@@ -315,25 +315,25 @@ DeepRTE 的网络超参数列于表~\ref{tab:parameters}。网络由衰减模块
     \bicaption{在 Delta 函数训练数据集上训练所得的损失曲线，展示了随 epoch 推进的收敛行为。}{Loss curve. Obtained from training the model on a delta function training dataset, illustrating the convergence behavior over epochs.}\label{fig:loss}
 \end{figure}
 
-\subsubsection{线性性质验证}\label{sec:linearity_val}
+\subsection{线性性质验证}\label{sec:linearity_val}
 
 DeepRTE 的网络结构在设计时就有意保持了对入射边界函数 $I_{-}$ 的线性性质。根据~\eqref{eq:greens-integral-nn}，DeepRTE 中使用的神经网络 $G^{\text{NN}}$ 以积分形式表征了解算子 $\ANN$ 的核（即格林函数），因此在连续和离散层面上，DeepRTE 从 $I_{-}$ 到解的整体映射应当保持线性。
 
 为验证这一结论，本节通过数值实验证明模型同时满足可加性与齐次性两条基本线性性质。所有实验均在固定的截面系数 $\mu_t,\mu_s$ 与相函数 $p$ 条件下进行，其具体设置为
 \begin{equation}
-    \mu_t(x,y) =
-    \begin{cases}
-        6,  & \text{若 } (x,y) \in D_\mu,    \\
-        10, & \text{若 } (x,y) \notin D_\mu,
-    \end{cases}
-    \quad
-    \mu_s(x,y) =
-    \begin{cases}
-        3, & \text{若 } (x,y) \in D_\mu,    \\
-        5, & \text{若 } (x,y) \notin D_\mu,
-    \end{cases}
-    \quad
-    g=0.5, \quad D_\mu = [0.4, 0.6]^2.
+    \begin{aligned}
+        \mu_t(x,y) & =
+        \begin{cases}
+            6,  & \text{若 } (x,y) \in D_\mu,    \\
+            10, & \text{若 } (x,y) \notin D_\mu,
+        \end{cases}            \\
+        \mu_s(x,y) & =
+        \begin{cases}
+            3, & \text{若 } (x,y) \in D_\mu,    \\
+            5, & \text{若 } (x,y) \notin D_\mu,
+        \end{cases}             \\
+        g          & =0.5, \quad D_\mu = [0.4, 0.6]^2.
+    \end{aligned}
 \end{equation}
 下文中，记 DeepRTE 解算子为 $\ANN$（省略参数依赖）。
 
@@ -500,7 +500,7 @@ DeepRTE 的网络结构在设计时就有意保持了对入射边界函数 $I_{-
 \end{equation}
 明显低于上述理论上界，从数值上支持了定理~\ref{thm:error-estimate} 的误差分解结论。
 
-\subsubsection{迁移学习与零样本性能}
+\subsection{迁移学习与零样本性能}
 
 本小节考察 DeepRTE 框架在迁移学习与零样本（Zero-Shot）场景下的表现。迁移学习允许模型将某一任务上学到的知识迁移到相关任务，以提升后者的性能；零样本能力则指在不额外训练的情况下，将模型直接应用于全新的条件。为展示 DeepRTE 在 RTE 问题上的此类能力——特别是其在几乎不做额外训练的前提下，适应新边界条件的能力——我们首先在 Delta 函数型入射边界条件数据集上训练模型，以学习 RTE 的基本物理规律；随后，在与训练集分布完全不同的边界条件上对模型进行测试，评估其泛化与零样本外推性能。
 

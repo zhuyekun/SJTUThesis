@@ -1,17 +1,17 @@
 \section{算子验证}\label{sec:ablation-study}
 
-DeepRTE 的架构设计旨在通过将 RTE 解算子分解为模拟沿特征线传输的衰减分量（算子 $\J$ 和 $\cL$）以及捕捉散射行为的散射分量（$\cS$），从而反映 RTE 解的数学结构，如第~\ref{sec:architecture} 节所述。
+DeepRTE 的架构设计旨在通过将 RTE 解算子分解为模拟沿特征线传输的衰减分量（算子 $\J$ 和 $\cL$）以及捕捉散射行为的散射分量（$\cS$），从而反映 RTE 解的数学结构，如前面章节所述。
 每个分量在 DeepRTE 中都通过独特的神经模块实现：衰减模块（第~\ref{sec:attenuation-module} 节）和散射模块（第~\ref{sec:scattering-module} 节）。
 为了验证这一设计选择，我们进行了精心设计的数值实验，以评估每个学习到的分量是否直接对应于其解析形式。
 作为对照，我们还将 DeepRTE 与不包含任何 RTE 特定归纳偏置的基线模型进行了比较。
 
-我们将 DeepRTE 与多输入算子（Multi-Input Operator, MIO）~\todo[inline]{jin2022mionet}（一种源自 DeepONet 的算子学习框架，可接受多个输入函数）作为基线模型进行比较，后者采用整体架构，未针对 RTE 进行专门设计。我们选择 MIO 作为基线的原因如下：
+我们将 DeepRTE 与多输入算子（Multi-Input Operator, MIO）~\cite{jin2022mionet}（一种源自 DeepONet 的算子学习框架，可接受多个输入函数）作为基线模型进行比较，后者采用整体架构，未针对 RTE 进行专门设计。我们选择 MIO 作为基线的原因如下：
 \begin{itemize}
     \item MIO 是最常用的能够处理多函数输入的算子学习框架之一，使其适合学习依赖于多个输入函数（$I_-$、$\mut$、$\mus$ 和 $p$）的 RTE 解算子。
-    \item 在给定足够的训练数据和网络容量的情况下，MIO（DeepONet）理论上可以逼近任何连续算子，包括 RTE 解算子~\todo[inline]{lu2021learning}。
+    \item 在给定足够的训练数据和网络容量的情况下，MIO（DeepONet）理论上可以逼近任何连续算子，包括 RTE 解算子~\cite{lu2021learning}。
     \item MIO 不包含任何针对 RTE 的物理信息归纳偏置，这使我们能够分离出反映 RTE 数学结构的 DeepRTE 架构的影响。
 \end{itemize}
-虽然 FNO~\todo[inline]{li2020fourier} 是另一个潜在的基线，但由于几个基本限制，它不适合此任务：
+虽然 FNO~\cite{li2020fourier} 是另一个潜在的基线，但由于几个基本限制，它不适合此任务：
 \begin{itemize}
     \item FNO 旨在学习将规则网格上的函数映射到同一网格上的函数的算子，这与 RTE 处理角度变量和复杂边界条件的要求不符。
     \item FNO 依赖傅里叶变换来捕捉全局（非局部）信息，但这种方法在高维 RTE 解空间（空间和角度维度）中面临重大挑战，导致计算和内存成本过高。在我们的初步测试中，这些成本使得在我们的计算预算内训练 FNO 变得不可行。
@@ -58,7 +58,7 @@ DeepRTE 的架构设计旨在通过将 RTE 解算子分解为模拟沿特征线�
 
 在我们的数值实验中，我们通过移除所有与散射相关的组件来实现这一点：我们将散射块的数量设置为 $N_\ell = 0$，并将 $\mu$ 的维度从 $2$ 减少到 $1$，从而有效地禁用了依赖于 $\mu_s$ 的注意力机制。
 
-为了验证我们的架构确实捕捉到了衰减效应，我们将它与没有任何 RTE 专用架构的 MIO 进行比较。我们这里使用的 MIO 网络是非常标准的，见~\todo[inline]{jin2022mionet}：
+为了验证我们的架构确实捕捉到了衰减效应，我们将它与没有任何 RTE 专用架构的 MIO 进行比较。我们这里使用的 MIO 网络是非常标准的，见~\cite{jin2022mionet}：
 \begin{equation}
     J_b(\br,\bOmega) \approx \text{MIO}_{\J}(\mut,I_{-}) := (\text{MLP}^{\text{branch}}_1(\mut)\odot\text{MLP}^{\text{branch}}_2(I_-))\cdot \text{MLP}^{\text{trunk}}(\br,\bOmega).
 \end{equation}
@@ -92,7 +92,7 @@ DeepRTE 的架构设计旨在通过将 RTE 解算子分解为模拟沿特征线�
 \end{equation}
 
 对于数据集构建，除了 $g$（不需要）和边界条件 $I_- = 0$（设置为 0）之外，所有其他设置保持不变（见表~\ref{tab:dataset}）。
-对于源项 $I(\br,\bOmega)$，我们使用谱合成方法~\todo[inline]{liu2019advances, ruan1998efficient} 在频域中生成二维高斯随机场。
+对于源项 $I(\br,\bOmega)$，我们使用谱合成方法~\cite{liu2019advances, ruan1998efficient} 在频域中生成二维高斯随机场。
 我们使用与第~\ref{sec:dataset-construction} 节相同的数值求解器，除了我们将散射替换为 $\mus I$。
 按照这些设置，我们生成了 $1000$ 个样本用于训练，以及 $100$ 个独立同分布样本用于测试。
 
@@ -149,7 +149,7 @@ $\ANN_{\text{w/o }\cS}$ 与完整 DeepRTE $\ANN$ 之间的唯一区别在于散�
 \end{table}
 
 
-我们注意到，在我们的 DeepRTE 模型中，提升算子 $\cL$~\eqref{eq:lifting-op} 同时出现在衰减模块（见~\eqref{eq:L-op}，且由于 $\mus$ 包含在 $\tau_{-}^{\text{NN}}$ 中，见注~\ref{rmk:optical-depth-encoding}）和散射模块（见~\eqref{eq:scattering-mus}）中。这一设计选择反映了我们基于数学域分离操作的架构原则：衰减模块处理沿特征线作用于空间变量的算子（由注意力机制捕捉），而散射模块处理作用于角度变量的算子（由角度积分捕捉）。这种分离简化了模型架构，并通过重复模块化块促进了可扩展性。
+我们注意到，在我们的 DeepRTE 模型中，提升算子 $\cL$~\eqref{eq:lifting-op} 同时出现在衰减模块（见~\eqref{eq:L-op}，且由于 $\mus$ 包含在 $\tau_{-}^{\text{NN}}$ 和散射模块（见~\eqref{eq:scattering-mus}）中。这一设计选择反映了我们基于数学域分离操作的架构原则：衰减模块处理沿特征线作用于空间变量的算子（由注意力机制捕捉），而散射模块处理作用于角度变量的算子（由角度积分捕捉）。这种分离简化了模型架构，并通过重复模块化块促进了可扩展性。
 
 
 \subsection{与 MIO 的整体对比}

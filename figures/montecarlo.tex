@@ -1,0 +1,80 @@
+\documentclass[tikz,border=5pt]{standalone}
+\usepackage[fontset=none]{ctex}
+\setCJKmainfont{FandolSong-Regular}
+\setCJKsansfont{FandolHei-Regular}
+\setCJKmonofont{FandolFang-Regular}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta}
+
+% 定义流程图节点样式
+\tikzstyle{startstop} = [
+  rectangle,
+  rounded corners,
+  minimum width=4em,
+  text centered,
+  inner sep=1.5ex,
+  draw
+]
+\tikzstyle{io} = [
+  trapezium,
+  trapezium left angle=75,
+  trapezium right angle=105,
+  minimum width=4em,
+  text centered,
+  inner sep=1.5ex,
+  draw
+]
+\tikzstyle{process} = [
+  rectangle,
+  minimum width=4em,
+  text centered,
+  inner sep=1.5ex,
+  draw
+]
+\tikzstyle{decision} = [
+  diamond,
+  minimum width=4em,
+  aspect=2,
+  text centered,
+  draw
+]
+\tikzstyle{arrow} = [-{LaTeX}]
+
+\begin{document}
+\begin{tikzpicture}[node distance=2.5cm, every node/.style={font=\footnotesize}]
+    % Row 1
+    \node[startstop] (start) {开始：发射光子};
+    \node[process, right of=start, node distance=3.5cm] (stepsize) {确定步长};
+    \node[process, right of=stepsize, node distance=3.5cm] (move) {移动光子};
+    \node[process, right of=move, node distance=3.5cm] (remove) {移除吸收权重};
+
+    % Row 2
+    \node[process, below of=remove] (scatter) {散射光子};
+    \node[decision, left of=scatter, node distance=3.5cm] (weight) {权重低于阈值？};
+    \node[decision, left of=weight, node distance=3.5cm] (roulette) {光子存活？};
+    \node[decision, left of=roulette, node distance=3.5cm] (last) {最后一个光子？};
+
+    % Row 3
+    \node[startstop, below of=last] (done) {结束};
+
+    % Connections
+    \draw[arrow] (start) -- (stepsize);
+    \draw[arrow] (stepsize) -- (move);
+    \draw[arrow] (move) -- (remove);
+    \draw[arrow] (remove) -- (scatter);
+    \draw[arrow] (scatter) -- (weight);
+    \draw[arrow] (weight) -- node[above] {是} (roulette);
+    \draw[arrow] (roulette) -- node[above] {否} (last);
+    \draw[arrow] (last) -- node[left] {是} (done);
+
+    % Loops
+    % Weight (No) -> Step Size (Diagonal/Bent arrow)
+    \draw[arrow] (weight.north) -- node[right] {否} ++(0,0.8cm) -| ([xshift=0.2cm]stepsize.south);
+
+    % Roulette (Yes) -> Step Size (Straight up)
+    \draw[arrow] (roulette.north) -- node[right] {是} (stepsize.south);
+
+    % Last (No) -> Start (Straight up)
+    \draw[arrow] (last.north) -- node[right] {否} (start.south);
+\end{tikzpicture}
+\end{document}

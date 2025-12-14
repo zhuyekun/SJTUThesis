@@ -128,14 +128,14 @@
     I^{m+1} = \cL\cS I^m + \J I_{-}.
 \end{equation}
 当初始猜测取为 $I^0 = \J I_{-}$ 时，该迭代与经典的源迭代方法
-\todo[inline]{~\cite{adams2002fast}}
-形式一致。进一步地，根据
-\todo[inline]{~\cite{egger2014lp}}
-的结论可知：在定理~\ref{thm:existence-uniqueness-lp} 的假设条件下，对任意 $1\leq p\leq \infty$，有
-\begin{equation}
-    \rho_p(\cL\cS) := \lim_{n\to\infty}\sqrt[n]{\| (\cL\cS)^n \|_{L^p(D\times V;\tau^{-1})}} \leq 1 - e^{-C_p} < 1.
-\end{equation}
-这表明不动点算子 $\cL\cS$ 的谱半径被一致地界定在 1 之下，从而保证迭代收敛到 RTE 的唯一解。因此，解算子可展开为级数形式：
+~\cite{adams2002fast}形式一致。进一步地，根据~\cite{egger2014lp} 的结论，我们有如下定理：
+\begin{theorem}[谱半径估计]\label{thm:spectral-radius}
+    在定理~\ref{thm:existence-uniqueness-lp} 的假设条件下，对任意 $1\leq p\leq \infty$，不动点算子 $\cL\cS$ 的谱半径满足
+    \begin{equation}
+        \rho_p(\cL\cS) := \lim_{n\to\infty}\sqrt[n]{\| (\cL\cS)^n \|_{L^p(D\times V;\tau^{-1})}} \leq 1 - e^{-C_p} < 1.
+    \end{equation}
+    这表明谱半径被一致地界定在 1 之下，从而保证迭代收敛到 RTE 的唯一解。
+\end{theorem}因此，解算子可展开为级数形式：
 \begin{equation}\label{eq:soln-op-series}
     \A[\mu_t,\mu_s,p] I_{-} = \sum_{n=0}^\infty(\cL\cS)^n\J I_{-}.
 \end{equation}
@@ -203,7 +203,6 @@
     I(\br, \bOmega)\approx I^\text{NN}(\br,\bOmega) = \ANN[\mut,\mus,p] I_{-} = \int_{\Gamma_-} G^{\text{NN}}(\br, \bOmega, \br', \bOmega') I_{-}(\br', \bOmega') \diff{\br'} \diff{\bOmega'},
 \end{equation}
 其中 $G^{\text{NN}}$ 是由深度神经网络参数化的格林函数。
-\todo[inline]{图片}
 \begin{figure}[!htp]
     \centering
     \includegraphics[width=1\textwidth]{figures/architecture.pdf}
@@ -391,7 +390,6 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
     \includegraphics[width=.8\textwidth]{figures/mask.pdf}
     \bicaption{掩码和相对位置嵌入。实心点表示特征线 $\delta$-邻域内的活动网格节点。这些节点为光学深度插值提供空间支持，从而避免全域计算。}{Mask and relative position embedding. Solid dots represent active grid nodes within the $\delta$-neighborhood of the characteristic line. These nodes provide spatial support for optical depth interpolation, thereby avoiding full-domain computation.}\label{fig:mask}
 \end{figure}
-\todo[inline]{图片}
 \begin{equation}
     \mathcal{C}_{\br,\bOmega} = \left \{\rmesh_i \mid \text{distance}\left(\rmesh_i, \{\br - s\bOmega, s\in(0,s_-(\br,\bOmega))\}\right) < \delta\right \}.
 \end{equation}
@@ -504,7 +502,6 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
 \end{itemize}
 在对比两种实现方式后，我们在散射块中采用后归一化（Post-Layer Normalization）结构，以在训练稳定性与实现简洁性之间取得平衡。
 
-\todo[inline]{图片}
 \begin{figure}[htp!]
     \centering
     \includegraphics[width=1\textwidth]{figures/scattering_block.pdf}
@@ -672,19 +669,21 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
 为此，我们对比了两套网络设计。
 首先，我们把符合物理意义的 $\bm{w}^\cL_{ij}$ 进行了实验的复现。具体来说，我们使用与衰减模块中相同的 OpticalDepthNet 来预测 $\tau(0,s'_j)$，并将 $\mus$ 从输入中直接提取出来计算 $\bm{w}^\cL_{ij}$。然后，将原衰减模块的输出$\bm{G}^{\text{NN}}$ 与 $\bm{w}^\cL_{ij}$ 拼接，形成散射模块的输入，即:
 \begin{equation}
-    \bm{G}^{0} = \mathrm{Concat}\left(\bm{G}^{\text{NN}}, \mathbf{W}^\ell\right), \quad
-    \bm{G}^{\text{NN}} =
-    \begin{pmatrix}
-        G^{\text{NN}}(\br-s_1 \bOmega, \bOmega; \br', \bOmega') \\
-        \vdots                                                  \\
-        G^{\text{NN}}(\br-s_{d_{\text{model}}} \bOmega, \bOmega; \br', \bOmega')
-    \end{pmatrix}, \quad
-    \mathbf{W}^\ell =
-    \begin{pmatrix}
-        \bm{w}^\cL_1 \\
-        \vdots       \\
-        \bm{w}^\cL_{d_{\text{model}}}
-    \end{pmatrix},
+    \begin{aligned}
+        \bm{G}^{0}         & = \mathrm{Concat}\left(\bm{G}^{\text{NN}}, \mathbf{W}^\ell\right),             \\
+        \bm{G}^{\text{NN}} & =
+        \begin{pmatrix}
+            G^{\text{NN}}(\br-s_1 \bOmega, \bOmega; \br', \bOmega') \\
+            \vdots                                                  \\
+            G^{\text{NN}}(\br-s_{d_{\text{model}}} \bOmega, \bOmega; \br', \bOmega')
+        \end{pmatrix}, \\
+        \mathbf{W}^\ell    & =
+        \begin{pmatrix}
+            \bm{w}^\cL_1 \\
+            \vdots       \\
+            \bm{w}^\cL_{d_{\text{model}}}
+        \end{pmatrix},
+    \end{aligned}
 \end{equation}
 其中 $\bm{w}^\cL_{ij} = \tilde{w}_j^{\br-s'_i \bOmega, \bOmega} \mus(\br-s'_j\bOmega) e^{-\tau^{NN}_{-,s}(0,s'_j)}$。
 
