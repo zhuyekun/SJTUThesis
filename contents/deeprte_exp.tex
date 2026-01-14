@@ -1,7 +1,7 @@
 \section{数值实验与结果}
 \label{sec:experiments}
 
-本节给出若干数值算例，用于系统评估 DeepRTE 在辐射传输方程求解中的精度与效率。实际应用中，RTE~\eqref{eq:rte} 定义在三维空间变量 $\br\in\mathbb{R}^3$ 与角变量 $\bOmega\in\sS^2$ 上，对应 $d=3$，因此为六维问题。通过适当的变量变换与对称性分析，可以将其约化为低维模型，从而降低数值计算的整体复杂度。
+本节给出若干数值算例，用于系统评估 DeepRTE 在辐射传输方程求解中的精度与效率。实际应用中，RTE~\eqref{eq:rte} 定义在三维空间变量 $\br\in\mathbb{R}^3$ 与角变量 $\bOmega\in\sS^2$ 上，对应 $d=3$，因此是一个六维问题。借助适当的变量变换与对称性分析，可将其约化为低维模型，从而降低计算复杂度。
 
 在笛卡尔坐标系下，记
 \begin{equation}
@@ -9,7 +9,7 @@
         {\left(1-\zeta^{2}\right)}^{\frac{1}{2}} \cos\theta, \quad s =
         {\left(1-\zeta^{2}\right)}^{\frac{1}{2}} \sin\theta, \quad \text{for }|\zeta| \leq 1.
 \end{equation}
-令总截面 $\mut$ 与散射截面 $\mus$ 仅依赖于平面坐标 $(x,y)$，且强度 $I$ 在 $z$ 方向上均匀，则定义
+若总截面 $\mut$ 与散射截面 $\mus$ 仅依赖于平面坐标 $(x,y)$，且强度 $I$ 在 $z$ 方向上均匀，可定义
 \begin{equation}
     \tilde{I}(x, y,\zeta,\theta) = \frac{1}{2}\bigl[I(x,y,z,c,s,\zeta) + I(x,y,z,c,s,-\zeta)\bigr],
 \end{equation}
@@ -17,23 +17,24 @@
 \begin{equation}
     \tilde{p}(\zeta,\theta,\zeta^*, \theta^*) = \frac{1}{2}\bigl[p(c,s,\zeta, c^*,s^*,\zeta^*) + p(c,s,\zeta, c^*,s^*,-\zeta^*)\bigr],
 \end{equation}
-则两者均与 $z$ 无关，且关于 $\zeta$ 为偶函数。由此，方程~\eqref{eq:rte-with-bc} 可约化为
+此时二者与 $z$ 无关，且关于 $\zeta$ 为偶函数，从而方程~\eqref{eq:rte-with-bc} 可约化为
 \begin{equation}
-    \bigl(c\partial_x \tilde{I}(x,y,\zeta,\theta)+s\partial_y
-    \tilde{I}(x,y,\zeta,\theta)\bigr)+\mut \,\tilde{I}(x,y,\zeta,\theta)=\frac{\mus}{2\pi}\int_{0}^{1}
-    \int_0^{2\pi} \tilde{p}(\zeta, \theta, \zeta^*,\theta^*) \,\tilde{I}(x,y,\zeta^*,\theta^*) \,\diff{\theta^*}\diff{\zeta^*},
+    \begin{aligned}
+         & c\partial_x \tilde{I}(x,y,\zeta,\theta)+s\partial_y \tilde{I}(x,y,\zeta,\theta)+\mut \,\tilde{I}(x,y,\zeta,\theta)                                              \\
+         & \quad= \frac{\mus}{2\pi}\int_{0}^{1}\int_0^{2\pi} \tilde{p}(\zeta, \theta, \zeta^*,\theta^*) \,\tilde{I}(x,y,\zeta^*,\theta^*) \,\diff{\theta^*}\diff{\zeta^*},
+    \end{aligned}
 \end{equation}
-配以入射边界条件
+加上入射边界条件
 \begin{equation}
     \tilde{I}(x,y,\bOmega)=\tilde{I}_{-}(x,y,\bOmega), \quad \text{当 }
     \bOmega\cdot\bm{n}<0,\quad (x, y)\in\partial D.
 \end{equation}
 
-相函数 $p$ 是辐射传输方程中的关键组成部分，通常仅依赖入射与出射方向之间的夹角。本文采用归一化的 Henyey--Greenstein（H-G）相函数作为各向异性散射的代表性模型：
+相函数 $p$ 是辐射传输方程的核心组成，通常仅与入射、出射方向的夹角相关。本文选用归一化的 Henyey--Greenstein（H-G）相函数作为各向异性散射的代表模型：
 \begin{equation}
     p(\bOmega,\bOmega^*) = p(\bOmega\cdot\bOmega^*) = \frac{1-g^2}{{\Bigl(1+g^2-2g\,(cc^*+ss^*+\zeta\zeta^*)\Bigr)}^{\frac{3}{2}}}.
 \end{equation}
-其中参数 $g$ 控制前向与后向散射的相对权重：$g=0$ 时对应各向同性散射，$g\to 1$ 时则对应高度前向集中的散射。虽然本文数值实验均基于 H-G 相函数，但算法本身可直接推广到其他散射模型。
+其中参数 $g$ 控制前向与后向散射的相对权重：$g=0$ 对应各向同性散射，$g\to 1$ 则对应高度前向集中的散射。尽管数值实验基于 H-G 相函数，算法本身仍可直接适配其他散射模型。
 
 \subsection{数据集构造}\label{sec:dataset-construction}
 
@@ -44,7 +45,7 @@
 数值实验在矩形空间区域 $D = [0, 1]\times[0, 1]\subset \mathbb{R}^2$ 以及角度空间 $\mathbb{S}^{2}$ 上进行。每个空间方向均采用 $40$ 个等间距网格点。
 
 \paragraph{角度求积点}
-角度求积点选取为区间 $[-1,1]$ 上 $2N$ 阶标准勒让德多项式的正根。本文取 $N=3$，对应的求积点与权重列于表~\ref{tab:quadrature}。
+角度求积点选取为区间 $[-1,1]$ 上 $2N$ 阶标准勒让德多项式的正根。本文取 $N=3$，对应的求积点与权重列于表~\ref{tab:quadrature} ，其中，$\zeta_i$ 与 $\theta_i$ 分别为速度空间的求积点，$c_i$ 与 $s_i$ 为对应的余弦与正弦值，$w_i$ 为求积权重。总共 $24$ 个角度求积点覆盖了半球空间。
 
 \begin{table}[!htp]
     \centering
@@ -60,8 +61,9 @@
         0.9324695 & $\pi$/4    & 0.2554414 & 0.2554414 & 0.1713245 \\
         \bottomrule
     \end{tabular}
-    \bicaption{角度求积点及其权重。$\zeta_i$ 与 $\theta_i$ 为速度空间求积点，$c_i$ 与 $s_i$ 分别为对应的余弦与正弦值，$w_i$ 为求积权重。}{Angular quadrature points and weights of the quadrature set. $\zeta_i$ and $\theta_i$ are the quadrature points of the velocity space, $c_i$ and $s_i$ are the corresponding cosine and sine values, and $w_i$ is the quadrature weight.}\label{tab:quadrature}
+    \bicaption{角度求积点及其权重。}{Angular quadrature points and weights of the quadrature set.}\label{tab:quadrature}
 \end{table}
+
 
 \paragraph{截面系数}
 总截面 $\mu_t(x,y)$ 与散射截面 $\mu_s(x,y)$ 在子区域 $D_\mu = [0.4, 0.6] \times [0.4, 0.6]$ 上随机取值，其余区域取常数，具体定义为
@@ -106,11 +108,14 @@
 \end{equation}
 其中，$y_l'$（left）、$y_r'$（right）、$x_b'$（bottom）与 $x_t'$（top）分别为对应边界上高斯束中心的坐标，从离散网格点中均匀随机选取。角变量 $c_l'$、$c_r'$、$c_b'$、$c_t'$ 及 $s_l'$、$s_r'$、$s_b'$、$s_t'$ 则从满足入射条件的离散速度方向中均匀采样。空间与角度方向上的尺度参数分别满足
 \begin{equation}
-    \sigma_{\br} \sim \mathcal{U}(0.005\sqrt{2},0.02\sqrt{2}), \quad \sigma_{\bOmega} \sim \mathcal{U}(0.005\sqrt{2},0.01\sqrt{2}).
+    \begin{aligned}
+        \sigma_{\br}     & \sim \mathcal{U}(0.005\sqrt{2},0.02\sqrt{2}), \\
+        \sigma_{\bOmega} & \sim \mathcal{U}(0.005\sqrt{2},0.01\sqrt{2}).
+    \end{aligned}
 \end{equation}
 
 \paragraph{数据归一化}
-在训练过程中，将强度 $I$ 归一化到区间 $[0, 1]$：
+在训练过程中，将辐射强度 $I$ 归一化到区间 $[0, 1]$：
 \begin{equation}
     I_{\text{norm}} = \frac{I - I_{\text{min}}}{I_{\text{max}} - I_{\text{min}}},
 \end{equation}
@@ -124,7 +129,7 @@
     \item \textbf{强前向散射（Highly forward peaking）}: $ g \sim \mathcal{U}(0.7, 0.9)$，对应粒子主要沿前向传播的强各向异性情形，此时粒子轨迹高度相关、位置与散射方向紧密耦合，边界条件的微小变化也可能显著影响解的行为。
 \end{itemize}
 
-上述数据集构造所用的超参数汇总于表~\ref{tab:dataset}。
+上述数据集构造所用的超参数汇总于表~\ref{tab:dataset}。表中给出了计算区域、截面系数、离散参数、边界条件以及散射参数等设置。
 \begin{table}[!htp]
     \centering
     \begin{tabular}{lp{0.3\textwidth}ll}
@@ -151,7 +156,7 @@
                               &                          &                          & $\mathcal{U}(0.7,0.9)$               \\
         \bottomrule
     \end{tabular}
-    \bicaption{数据集构造中使用的超参数汇总。表中给出了计算区域、截面系数、离散参数、边界条件以及散射参数等设置。}{Summary of hyperparameters for dataset construction. This table details the computational domain, cross sections, discretization, boundary conditions, and other parameters used.}\label{tab:dataset}
+    \bicaption{数据集构造中使用的超参数汇总。}{Summary of hyperparameters for dataset construction.}\label{tab:dataset}
 \end{table}
 
 \subsection{训练细节}
@@ -162,23 +167,23 @@
     \centering
     \begin{tabular}{ll}
         \toprule
-        超参数（Hyperparameters）  & 取值（Value）                  \\ \midrule
-        优化器（Optimizer）        & Adam                       \\
-        学习率策略（Schedule）       & 余弦退火（Cosine annealing）     \\
-        初始学习率                 & $1 \times 10^{-3}$         \\
-        批大小（Batch size）       & 8                          \\
-        训练轮数（Epochs）          & 5000                       \\
-        训练样本数                 & 800                        \\
-        验证样本数                 & 200                        \\
-        配点数量（Collocation pts） & 128                        \\
-        硬件（Hardware）          & 4$\times$ NVIDIA 4090 GPUs \\
+        超参数                  & 取值                         \\ \midrule
+        优化器（Optimizer）       & Adam                       \\
+        学习率策略（Schedule）      & 余弦退火（Cosine annealing）     \\
+        初始学习率（Learning rate） & $1 \times 10^{-3}$         \\
+        批大小（Batch size）      & 8                          \\
+        训练轮数（Epochs）         & 5000                       \\
+        训练样本数                & 800                        \\
+        验证样本数                & 200                        \\
+        配点数量                 & 128                        \\
+        硬件                   & 4$\times$ NVIDIA 4090 GPUs \\
         \bottomrule
     \end{tabular}
-    \bicaption{模型训练超参数汇总。表中列出了优化器、学习率策略与初值、数据规模以及硬件配置等信息。}{Summary of model training hyperparameters. This table details the optimizer and training hyperparameters, including learning rate, dataset settings, and hardware information.}
+    \bicaption{模型训练超参数汇总。}{Summary of model training hyperparameters.}
     \label{tab:training_details}
 \end{table}
 
-模型训练采用 Adam 优化器与余弦退火（cosine annealing）学习率策略。对每个散射区间，各生成 $800$ 个训练样本与 $200$ 个验证样本。训练在四张 NVIDIA RTX 4090 GPU 上进行，共训练 $5000$ 个 epoch。初始学习率设为 $1 \times 10^{-3}$，batch size 取 $8$，损失函数中使用的 collocation 点数（见~\eqref{eq:collocation_points}）为 $128$。训练超参数如表~\ref{tab:training_details} 所示。
+模型训练采用 Adam 优化器与余弦退火（cosine annealing）学习率策略。对每个散射区间，各生成 $800$ 个训练样本与 $200$ 个验证样本。训练在四张 NVIDIA RTX 4090 GPU 上进行，共训练 $5000$ 个 epoch。初始学习率设为 $1 \times 10^{-3}$，batch size 取 $8$，损失函数中使用的采样点数（见~\eqref{eq:collocation_points}）为 $128$。训练超参数如表~\ref{tab:training_details} 所示，表中列出了优化器、学习率策略与初值、数据规模以及硬件配置等信息。
 
 \paragraph{网络结构}
 DeepRTE 的网络超参数列于表~\ref{tab:parameters}。网络由衰减模块与散射模块两部分构成，对应的层数、隐含维度、输出维度、多头注意力头数以及潜在特征维度等均在表中给出。
@@ -187,21 +192,20 @@ DeepRTE 的网络超参数列于表~\ref{tab:parameters}。网络由衰减模块
     \centering
     \begin{tabular}{lll}
         \toprule
-        Module Name                  & Hyperparameters                          & Value \\ \midrule
-        \multirow{7}{*}{Attenuation} & \texttt{num\_layer}
-        $N_{\text{mlp}}$             & 4                                                \\
-                                     & \texttt{hidden\_dim}  $d_{\text{mlp}}$   & $128$ \\
-                                     & \texttt{output\_dim}  $d_{\text{model}}$ & $16$  \\
-                                     & \texttt{num\_head}    $N_{\text{head}}$  & $2$   \\
-                                     & \texttt{key\_dim}     $d_k$              & $32$  \\
-                                     & \texttt{value\_dim}   $d_v$              & $32$  \\
-                                     & \texttt{output\_dim}  $d_{\tau}$         & $2$   \\
+        模块                    & 超参数                                     & 取值    \\ \midrule
+        \multirow{7}{*}{衰减模块} & \texttt{num\_layer} $N_{\text{mlp}}$    & 4     \\
+                              & \texttt{hidden\_dim} $d_{\text{mlp}}$   & $128$ \\
+                              & \texttt{output\_dim} $d_{\text{model}}$ & $16$  \\
+                              & \texttt{num\_head} $N_{\text{head}}$    & $2$   \\
+                              & \texttt{key\_dim} $d_k$                 & $32$  \\
+                              & \texttt{value\_dim} $d_v$               & $32$  \\
+                              & \texttt{output\_dim} $d_{\tau}$         & $2$   \\
         \midrule
-        \multirow{2}{*}{Scattering}  & \texttt{num\_block}   $N_{\ell}$         & $2$   \\
-                                     & \texttt{latent\_dim}  $d_{\text{model}}$ & $16$  \\
+        \multirow{2}{*}{散射模块} & \texttt{num\_block} $N_{\ell}$          & $2$   \\
+                              & \texttt{latent\_dim} $d_{\text{model}}$ & $16$  \\
         \bottomrule
     \end{tabular}
-    \bicaption{DeepRTE 网络超参数。网络由衰减模块与散射模块两部分构成，表中给出了层数、隐含维度、输出维度、多头数、键/值维度以及潜在特征维度等。}{DeepRTE network hyperparameters. The network consists of two modules: the attenuation module and the scattering module. The hyperparameters include the number of layers, hidden dimensions, output dimensions, number of heads, key dimensions, value dimensions, and latent dimensions.}\label{tab:parameters}
+    \bicaption{DeepRTE 网络超参数。}{DeepRTE network hyperparameters.}\label{tab:parameters}
 \end{table}
 
 
@@ -220,14 +224,14 @@ DeepRTE 的网络超参数列于表~\ref{tab:parameters}。网络由衰减模块
                                  &                        & 中度各向异性 & (0.4, 0.6) & 5.453                   & 2.759      \\ \cmidrule(l){3-6}
                                  &                        & 强前向散射  & (0.7, 0.9) & 7.223                   & 3.181      \\ \bottomrule
     \end{tabular}
-    \bicaption{DeepRTE 在三种散射区间上的精度指标。所有验证样本与训练集分布一致，表中给出了各区间上的 MSE 与 RMSPE，均表现出较高精度。}{Accuracy validation of DeepRTE model across three distinct scattering regimes. All validation experiments were conducted on a dataset sharing the same distribution as the training dataset. The table demonstrates that the model achieves high accuracy with RMSPE consistently below 3.2\% across all regimes.}\label{tab:accuracy}
+    \bicaption{DeepRTE 在三种散射区间上的精度指标。}{Accuracy validation of DeepRTE model across three distinct scattering regimes.}\label{tab:accuracy}
 \end{table}
 
 从表~\ref{tab:accuracy} 可见，在所有散射区间内，DeepRTE 的 MSE 均不超过 $7.3 \times 10^{-10}$，RMSPE 控制在 $3.2\%$ 以内，表明模型在不同散射强度下均具有较高精度。具体而言，在近各向同性区间中，MSE 为 $5.630 \times 10^{-10}$，RMSPE 为 $2.827\%$，在几乎各向同性情形下表现优异；在中度各向异性区间中，MSE 略有降低（$5.453 \times 10^{-10}$），RMSPE 为 $2.759\%$，精度相当；在强前向散射区间中，由于散射高度各向异性，问题更具挑战性，但模型仍能保持 $7.223 \times 10^{-10}$ 的 MSE 与 $3.181\%$ 的 RMSPE，反映出良好的鲁棒性。
 
-表~\ref{tab:accuracy-figs} 给出了三个散射区间中代表性算例的可视化对比结果。对每个区间，我们依次展示：密度 $\Phi$ 的三维真值、二维投影真值、模型预测以及二者之差的绝对误差。
-
 表~\ref{tab:time_compare} 给出了 DeepRTE 与传统方法在运行时间上的对比，用以体现本方法在效率方面的优势。快速扫掠法分别采用 CPU 与 GPU 两种实现：CPU 版本基于 Python（NumPy 与 SciPy），在 Intel(R) Xeon(R) Silver 4410Y（12 核）上运行，耗时约 $193.0$ 秒；GPU 版本基于 JAX，在多个设备之间进行数据分片、采用多 GPU 并行与 \texttt{jax.jit} JIT 编译（见算法~\ref{alg:fast-sweeping-gpu}），在 $4\times$ NVIDIA GeForce RTX 4090 上耗时约 $16.7$ 秒，相比 CPU 提升约 $11.6$ 倍。相比之下，DeepRTE 在相同的 $4\times$ RTX 4090 上完成一次推理仅需 $2.3$ 秒，相比 GPU 快速扫掠法进一步加速约 $7.3$ 倍，相比 CPU 基线则加速约 $83.9$ 倍，推理效率优势十分显著。
+
+表~\ref{tab:accuracy-figs} 给出了三个散射区间中代表性算例的可视化对比结果。对每个区间，我们依次展示：密度 $\Phi$ 的三维真值、二维投影真值、模型预测以及二者之差的绝对误差。
 
 这些结果表明，DeepRTE 在不同散射参数设置下均能够较好地捕捉散射物理过程，在复杂的前向散射场景中仍能保持较低误差；同时，模型参数量仅约 $3.8\times 10^4$，推理效率较高，适合大规模高效模拟场景。
 
@@ -768,7 +772,7 @@ DeepRTE 的网络结构在设计时就有意保持了对入射边界函数 $I_{-
         $15.477$                                                    \\
         \bottomrule
     \end{tabular}
-    \bicaption{DeepRTE 在不同网格分辨率与测试集上的表现。评价数据集在 $40\times 40$ 网格上可达到 $5.45\times10^{-10}$ 的 MSE，而在粗网格上误差随分辨率下降而单调增大；Case I--III 亦表现出类似趋势。}{Performance of DeepRTE across different resolutions and test sets. The Evaluation Dataset shows very high precision, with an MSE of $5.45\times10^{-10}$ on the $40\times 40$ grid. In contrast, Cases I-III show a consistent increase in error on coarser grids. This increase is mainly because of the limitations of numerical integration. With the second-order midpoint rule, halving the grid resolution should theoretically make the integration error four times larger, which matches our findings.}\label{tab:mesh_independence_multiple_testsets}
+    \bicaption{DeepRTE 在不同网格分辨率与测试集上的表现。}{Performance of DeepRTE across different resolutions and test sets.}\label{tab:mesh_independence_multiple_testsets}
 \end{table}
 
 从表~\ref{tab:mesh_independence_multiple_testsets} 可以看出：对于评价数据集与 Case I，RMSPE 在 $40\times 40$ 网格上的范围约为 $1.8$--$2.8\%$，当网格减半至 $20\times 20$ 时误差上升到约 $3.8$--$10\%$。Case II 与 Case III 的误差增幅略大，但仍处于可接受范围，在粗网格（$10\times 10$）上 RMSPE 约为 $8$--$15\%$。

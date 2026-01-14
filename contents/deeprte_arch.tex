@@ -206,9 +206,10 @@
 \begin{figure}[!htp]
     \centering
     \includegraphics[width=1\textwidth]{figures/architecture.pdf}
-    \bicaption{DeepRTE 网络架构。该图展示了各种输入在整个过程中的变化。衰减模块处理相空间坐标和系数以近似算子 $\J$ 和 $\cL$，随后散射模块处理角度求积计算，同时进行算子迭代。最终，格林函数 $G^{\text{NN}}$ 与边界条件相乘并在 $\Gamma_-$ 上积分来计算辐射强度。}{DeepRTE network architecture. The diagram illustrates the alterations in various inputs throughout the process. Attenuation Module processes phase coordinates and coefficients to approximate operators $\J$, $\cL$, followed by Scattering Module handling angular quadrature evaluations for operator iterations. Ultimately the Green's function $G^{\text{NN}}$ is multiplied by the boundary conditions and integrated over $\Gamma_-$  to compute radiation field.}\label{fig:arch-overview}
+    \bicaption{DeepRTE 网络架构。}{DeepRTE network architecture. }\label{fig:arch-overview}
 \end{figure}
-DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:greens-function-iterations} 中迭代过程启发的若干模块组成，并在有限步内进行迭代。
+DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:greens-function-iterations} 中迭代过程启发的若干模块组成，并在有限步内进行迭代。该图展示了各种输入在整个过程中的变化。衰减模块处理相空间坐标和系数以近似算子 $\J$ 和 $\cL$，随后散射模块处理角度求积计算，同时进行算子迭代。最终，格林函数 $G^{\text{NN}}$ 与边界条件相乘并在 $\Gamma_-$ 上积分来计算辐射强度。
+
 输入特征包括：
 \begin{itemize}\label{list:attenuation-inputs}
     \item $(\br,\bOmega)$：待评估解的相空间坐标；
@@ -278,16 +279,19 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
 其中光学深度 $\tau_-^{\text{NN}}$ 由名为 OpticalDepthNet 的专用子网络计算。OpticalDepthNet 学习总截面 $\mut$ 决定光学深度的复杂方式，从而刻画 $\mu_t$ 对格林函数的影响。
 随后，多层感知机（MLP）在此基础上融合空间与角度信息，输出沿特征线的截断格林函数表示。
 
-衰减模块的整体结构见图~\ref{fig:attenuation-module} 与算法~\ref{alg:attenuation-module}。光学深度网络 $\tau_-^{\text{NN}}$（OpticalDepthNet）的细节将在下一小节中给出。
+衰减模块的整体结构见图~\ref{fig:attenuation-module}，该图展示了网络将空间坐标 ($\br,\br'$)、角度变量 ($\bOmega,\bOmega'$) 和截面 ($\mut,\mus$) 作为输入。OpticalDepthNet 子模块首先计算沿特征线的光学深度 $\tau_-^{\text{NN}}$。然后，这些特征由 MLP 处理，生成截断的格林函数表示 $\bG^{\text{NN}}\in\mathbb{R}^{d_{\text{model}}}$，该表示在离散点 $\br-s_i\bOmega$（特征线上的圆圈）处对辐射场进行采样。该架构有效地捕捉了局部散射效应和非局部衰减，同时通过降维保持了计算的可处理性。
+
+更多算法细节可以参考算法~\ref{alg:attenuation-module}。光学深度网络 $\tau_-^{\text{NN}}$（OpticalDepthNet）的细节将在下一小节中给出。
+
 \begin{figure}
     \centering
     \includegraphics[width=1\textwidth]{figures/attenuation_module.pdf}
     \bicaption{
-        衰减模块架构。网络将空间坐标 ($\br,\br'$)、角度变量 ($\bOmega,\bOmega'$) 和截面 ($\mut,\mus$) 作为输入。OpticalDepthNet 子模块首先计算沿特征线的光学深度 $\tau_-^{\text{NN}}$。然后，这些特征由 MLP 处理，生成截断的格林函数表示 $\bG^{\text{NN}}\in\mathbb{R}^{d_{\text{model}}}$，该表示在离散点 $\br-s_i\bOmega$（特征线上的圆圈）处对辐射场进行采样。该架构有效地捕捉了局部散射效应和非局部衰减，同时通过降维保持了计算的可处理性。
-    }{Attenuation module architecture. The network takes as input the spatial coordinates ($\br,\br'$), angular variables ($\bOmega,\bOmega'$), and cross sections ($\mut,\mus$). The OpticalDepthNet submodule first computes the optical depth $\tau_-^{\text{NN}}$ along the characteristic line. These features are then processed by an MLP to produce the truncated Green's function representation $\bG^{\text{NN}}\in\mathbb{R}^{d_{\text{model}}}$, which samples the radiation field at discrete points $\br-s_i\bOmega$ (circles along characteristic line). This architecture efficiently captures both local scattering effects and non-local attenuation while maintaining computational tractability through dimension reduction.}\label{fig:attenuation-module}
+        DeepRTE衰减模块架构。
+    }{Attenuation module architecture.}\label{fig:attenuation-module}
 \end{figure}
 \begin{algorithm}[htp!]
-    \caption{Attenuation Module}\label{alg:attenuation-module}
+    \caption{衰减模块（Attenuation Module）}\label{alg:attenuation-module}
     \SetAlgoLined
     \KwIn{$\br,\bOmega,\br^{\prime},\bOmega^{\prime},\{\br_i^{\text{mesh}}\},\{{(\mut^{\text{mesh}})}_i\},\{{(\mus^{\text{mesh}})}_i\}, N_{\text{mlp}}=4,d_{\text{mlp}}=128,d_{\text{model}}=16$}
     \KwOut{$\bm{g}$}
@@ -408,7 +412,7 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
     c(\br-s_j\bOmega, \br^{\text{mesh}}_i) = c\left(s_j; {(r^\text{mesh}_\text{local})}_i, {(\theta^\text{mesh}_\text{local})}_i\right).
 \end{equation}
 \begin{algorithm}[htp!]
-    \caption{Relative Position Encoding}\label{alg:relative-position-encoding}
+    \caption{相对位置编码（Relative Position Encoding）}\label{alg:relative-position-encoding}
     \SetAlgoLined
     \KwIn{$\br, \bOmega, \tilde{\br}$}
     \KwOut{$(r_\text{local},\theta_\text{local}), m$}
@@ -449,10 +453,12 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
 \end{equation}
 其中，当网格点 $\rmesh_i$ 不属于集合 $\mathcal{C}$ 时取 $m_i=-10^{10}$，否则取 $0$，从而保证远离特征线的网格点对应的注意力权重近似为零。
 
+实现中，我们用法向量为速度反方向的半平面生成掩码 $M$，从而屏蔽远离特征线的网格点（见图~\ref{fig:mask}）。掩码的宽度可按需求调节：更宽的范围捕捉更复杂的光学深度变化，更窄的范围则进一步提升计算速度。
+
 综合上述要素，可得到算法~\ref{alg:optical-depth-net} 所示的 OpticalDepthNet 计算流程：
 
 \begin{algorithm}[htp!]
-    \caption{Optical Depth Network}\label{alg:optical-depth-net}
+    \caption{光学深度网络（Optical Depth Network）}\label{alg:optical-depth-net}
     \SetAlgoLined
     \KwIn{$\br, \bOmega, \{\br_i^{\text{mesh}}\}, \{{(\mut^{\text{mesh}})}_i\}, \{{(\mus^{\text{mesh}})}_i\}, d_k=12, H=2$}
     \KwOut{$\tau_{-}$}
@@ -504,14 +510,25 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
 
 \begin{figure}[htp!]
     \centering
-    \includegraphics[width=1\textwidth]{figures/scattering_block.pdf}
-    \bicaption{散射块。表示模拟算子 $\cS$ 作用一次的结果。包括积分的加权求和、线性投影和激活。}{Scattering module. Stacked residual blocks with physics-informed $\cS$-approximation layers, employing tanh-activated operator transforms and adaptive layer normalization for stabilized learning.}\label{fig:scattering-block}
+    \includegraphics[width=0.9\textwidth]{scattering_module.pdf}
+    \bicaption{散射模块。}{Scattering module.}\label{fig:scattering-module}
 \end{figure}
+
+
+图~\ref{fig:scattering-module}展示了散射模块的基本思路，即堆叠残差块，结合物理先验的 $\cS$ 近似层，并采用 tanh 激活的算子变换与自适应层归一化以稳定训练。
+
+\begin{figure}[htp!]
+    \centering
+    \includegraphics[width=1\textwidth]{figures/scattering_block.pdf}
+    \bicaption{散射块。}{Scattering block.}\label{fig:scattering-block}
+\end{figure}
+
+图~\ref{fig:scattering-block}表示模拟算子 $\cS$ 作用一次的结果。包括积分的加权求和、线性投影和激活。
 
 \noindent 散射模块的详细算法在算法~\ref{alg:scattering-module}中提供。
 
 \begin{algorithm}[htp!]
-    \caption{Scattering Module}\label{alg:scattering-module}
+    \caption{散射模块（Scattering Module）}\label{alg:scattering-module}
     \SetAlgoLined
     \KwIn{$\bm{g}, \{\bm{g}^*_j\}, \{p(\bOmega,\bOmega^*_i)\},\{p(\bOmega^*_i,\bOmega^*_j)\}, \{w_j\}, N_s=2$}
     \KwOut{$\bm{g}$}
@@ -608,7 +625,7 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
 散射块的详细计算步骤在算法~\ref{alg:scattering-block} 中给出。
 
 \begin{algorithm}[htp!]
-    \caption{Scattering Block}\label{alg:scattering-block}
+    \caption{散射块（Scattering Block）}\label{alg:scattering-block}
     \SetAlgoLined
     \KwIn{$\{\bm{g}_i\}, \{p_i\}, \{\omega_i\}, d_{\text{model}}=16$}
     \KwOut{$\bm{g}$}

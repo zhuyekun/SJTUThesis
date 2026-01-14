@@ -1,24 +1,19 @@
 % !TEX root = ../main.tex
 
 \begin{abstract}[zh]
-  中文摘要应该将学位论文的内容要点简短明了地表达出来，应该包含论文中的基本信息，
-  体现科研工作的核心思想。摘要内容应涉及本项科研工作的目的和意义、研究方法、研究
-  成果、结论及意义。注意突出学位论文中具有创新性的成果和新见解的部分。摘要中不宜
-  使用公式、化学结构式、图表和非公知公用的符号和术语，不标注引用文献编号。硕士学
-  位论文中文摘要字数为 500 字左右，博士学位论文中文摘要字数为 800 字左右。英文摘
-  要内容应与中文摘要内容一致。
+  辐射输运问题描述了光子束、质子束等在介质中传播的过程，广泛应用于医学物理、核工程等领域。但由于其高维性，积分碰撞项的复杂性，求解辐射输运方程面临着巨大的计算挑战。本文将主要聚焦于基于深度学习的方法来构造解算子求解辐射输运方程。
 
-  摘要页的下方注明本文的关键词（4 \textasciitilde{} 6 个）。
+  本文从稳态辐射输运方程的数学模型出发，通过算子分解分析解的结构性质，将求解过程改写为类不动点迭代格式；但其中若干关键算子难以解析获得，因此本文提出一种新型神经网络方法 DeepRTE，以深度神经网络对这些算子进行近似，并通过类残差的迭代式网络结构逼近辐射输运方程的稳态解。该框架在网络架构层面嵌入由辐射输运方程推导得到的物理信息与数学结构，从而在计算效率上优于传统方法与现有神经网络方法；同时引入多头注意力等机制，使模型能够以更少参数刻画高维输入之间的全局相关性并保持高精度。
+
+  为进一步提升模型的泛化能力，本文结合格林函数理论，将解表示为格林函数的卷积形式，并通过对 delta 函数入射边界条件的预训练来增强对不同边界设置的零样本（zero-shot）适应性，使 DeepRTE 成为一种无网格的神经算子框架。与此同时，本文将该思路扩展到含源项的输运方程，并以自编码神经网络的方式学习非稳态情形下的解算子。最后，本文实现了可在 GPU 上高效并行运行的 DeepRTE 算法，并通过系统的数值实验验证了所提方法的有效性与优越性。
+
+  % 摘要页的下方注明本文的关键词（4 \textasciitilde{} 6 个）。
 \end{abstract}
 
 \begin{abstract}[en]
-  Shanghai Jiao Tong University (SJTU) is a key university in China. SJTU was
-  founded in 1896. It is one of the oldest universities in China. The University
-  has nurtured large numbers of outstanding figures include JIANG Zemin, DING
-  Guangen, QIAN Xuesen, Wu Wenjun, WANG An, etc.
+  Radiative transport problems describe the propagation of photon beams, proton beams, and other particles through participating media, and arise in a wide range of applications such as medical physics and nuclear engineering. However, due to their high dimensionality and the complexity of the integral collision term, solving radiative transfer equations poses significant computational challenges. This thesis focuses on constructing solution operators for radiative transfer equations using deep learning.
 
-  SJTU has beautiful campuses, Bao Zhaolong Library, Various laboratories. It
-  has been actively involved in international academic exchange programs. It is
-  the center of CERNet in east China region, through computer networks, SJTU has
-  faster and closer connection with the world.
+  Starting from the mathematical model of the steady-state Radiative Transfer Equation (RTE), we analyze the structural properties of the solution via operator decomposition and rewrite the solution process into a fixed-point-like iterative form. Since several key operators in this formulation do not admit closed-form expressions, we propose a novel neural network method, termed DeepRTE, which uses deep neural networks to approximate these operators and employs a residual-style iterative architecture to approximate the steady-state solution of the RTE. By embedding physically derived information and mathematically informed structures into the network design, DeepRTE achieves higher computational efficiency than traditional solvers and existing neural network approaches. Moreover, mechanisms such as multi-head attention enhance the model expressivity for global correlations among high-dimensional inputs, enabling high accuracy with substantially fewer parameters.
+
+  To further improve generalization, we incorporate Green's function theory and represent the solution in a convolutional form with the learned Green's function. We additionally pre-train the model with delta-function inflow boundary conditions to strengthen its zero-shot adaptability to unseen boundary settings, making DeepRTE a mesh-free neural operator framework. Furthermore, we extend the overall methodology to transport equations with source terms, and learn a neural solution operator for the unsteady case via an autoencoder-based neural network. Finally, we implement a GPU-parallel DeepRTE solver and substantiate the effectiveness and superiority of the proposed approach through comprehensive numerical experiments.
 \end{abstract}

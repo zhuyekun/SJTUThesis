@@ -84,7 +84,7 @@ DeepRTE 的架构设计旨在通过将 RTE 解算子分解为模拟沿特征线�
 \begin{equation}
     G_{\cL}^{\text{NN}}(\br,\bOmega, \br', \bOmega';\mut,\mus) = \bG^{\text{NN}}(\br,\bOmega, \br', \bOmega', \tau^{\text{NN}}_{-})\bm{W}\in\mathbb{R}^1,
 \end{equation}
-其中 $\tau^{\text{NN}}_{-}$ 在算法~\ref{alg:optical-depth-net} 中定义，另见注~\ref{rmk:optical-depth-encoding}。$\bG^{\text{NN}}$ 的输出维度为 $d_\text{model}$，$\bm{W} \in \mathbb{R}^{d_{\text{model}}\times 1}$ 是一个可学习的权重矩阵，用于将输出投影到单个输出通道，类似于~\eqref{scattering_layer} 中的 $\bm{W}$。
+其中 $\tau^{\text{NN}}_{-}$ 在算法~\ref{alg:optical-depth-net} 中定义。$\bG^{\text{NN}}$ 的输出维度为 $d_\text{model}$，$\bm{W} \in \mathbb{R}^{d_{\text{model}}\times 1}$ 是一个可学习的权重矩阵，用于将输出投影到单个输出通道，类似于~\eqref{scattering_layer} 中的 $\bm{W}$。
 
 与 $\J$ 类似，我们将它与没有任何 RTE 专用架构的 $\text{MIO}_{\cL}$ 进行比较：
 \begin{equation}
@@ -96,7 +96,7 @@ DeepRTE 的架构设计旨在通过将 RTE 解算子分解为模拟沿特征线�
 我们使用与第~\ref{sec:dataset-construction} 节相同的数值求解器，除了我们将散射替换为 $\mus I$。
 按照这些设置，我们生成了 $1000$ 个样本用于训练，以及 $100$ 个独立同分布样本用于测试。
 
-\textbf{结果。} 表~\ref{tab:j_l_compare} 中的结果表明，我们的衰减模块 $\J^{\text{NN}}$ 和 $\cL^{\text{NN}}$ 在所有指标上都大幅优于 $\text{MIO}_{\J}$ 和 $\text{MIO}_\cL$。具体而言，$\J^{\text{NN}}$ 和 $\cL^{\text{NN}}$ 在训练和测试 MSE 上都实现了一个数量级以上的改进，同时参数量减少了 $34$ 倍（$37,282$ 对 $4956160$ 以及 $139,362$ 对 $4,792,320$）。测试 RMSPE 从 MIO 的 $44.251\%$、$25.350\%$ 降低到我们方法的 $2.339\%$、$1.327\%$。这种巨大的性能差异验证了我们的衰减模块设计有效地捕捉了算子 $\J$ 和 $\cL$ 固有的基于特征线的传输行为，而通用的 MIO 架构无法有效地学习这种专门的映射。
+表~\ref{tab:j_l_compare} 中的结果表明，我们的衰减模块 $\J^{\text{NN}}$ 和 $\cL^{\text{NN}}$ 在所有指标上都大幅优于 $\text{MIO}_{\J}$ 和 $\text{MIO}_\cL$。具体而言，$\J^{\text{NN}}$ 和 $\cL^{\text{NN}}$ 在训练和测试 MSE 上都实现了一个数量级以上的改进，同时参数量减少了 $34$ 倍（$37,282$ 对 $4,956,160$ 以及 $139,362$ 对 $4,792,320$）。测试 RMSPE 从 MIO 的 $44.251\%$、$25.350\%$ 降低到我们方法的 $2.339\%$、$1.327\%$。这种巨大的性能差异验证了我们的衰减模块设计有效地捕捉了算子 $\J$ 和 $\cL$ 固有的基于特征线的传输行为，而通用的 MIO 架构无法有效地学习这种专门的映射。
 \begin{table}
     \centering
     \begin{tabular}{@{}cccccccc@{}}
@@ -126,7 +126,7 @@ $\ANN_{\text{w/o }\cS}$ 与完整 DeepRTE $\ANN$ 之间的唯一区别在于散�
 \end{equation}
 其中不涉及散射算子 $\cS$，$\bm{W}^{\ell}$ 和 $\bm{b}^{\ell}$ 是 MLP 的可学习参数。此 MLP 中的参数数量保持与原始散射块大致相等，以确保公平比较。
 
-数据集和训练设置与原始 DeepRTE 相同（见第~\ref{sec:acc} 节）。为了评估模型在不同各向异性条件下的性能，训练集中的参数 $g$ 从 $0$ 到 $0.9$ 均匀采样。除了这个 $g$ 之外，$\text{DeepRTE}_{\cS}$ 的训练集使用与原始 DeepRTE 模型相同的配置。对于测试，我们在相同的三个散射区间~\ref{li:regimes} 上进行测试。
+数据集和训练设置与原始 DeepRTE 相同（见第~\ref{sec:acc} 节）。为了评估模型在不同各向异性条件下的性能，训练集中的参数 $g$ 从 $0$ 到 $0.9$ 均匀采样。除了这个 $g$ 之外，$\text{DeepRTE}_{\cS}$ 的训练集使用与原始 DeepRTE 模型相同的配置。对于测试，我们在相同的三个散射区间上进行测试。
 
 如果我们的假设是正确的，那么这个修改后的模型将成功拟合训练数据，并获得与原始 DeepRTE 相当的测试性能。相反，糟糕的训练拟合和巨大的测试误差将反驳我们的假设，并证明散射算子 $\cS$ 的必要性。表~\ref{tab:ablation_g} 中展示的实验结果有力地支持了后一种结论。请注意 $\ANN_{\text{w/o }\cS}$ 在散射高度前向峰值（强各向异性）的数据集上的糟糕表现。与完整 DeepRTE 模型相比，这种性能的显著下降清楚地表明，散射算子 $\cS$ 对于准确模拟 RTE 解算子至关重要。
 \begin{table}[htbp]

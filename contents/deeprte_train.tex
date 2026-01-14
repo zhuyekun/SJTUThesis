@@ -24,10 +24,10 @@
         \texttt{scattering\_kernel}: $[N_{\text{quad}}]$  & 散射核 $p(\bOmega, \bOmega^*)$                              \\
         \bottomrule
     \end{tabular}
-    \bicaption{DeepRTE 数据集特征。$N_\text{coords}$ 表示相空间采样点数，$N_\text{bc}$ 为边界采样点数，$N_\text{mesh}$ 为系数采样点数，$N_\text{quad}$ 为角度求积点数。}{DeepRTE features. $N_\text{coords}$ denotes the number of phase-space coordinates, $N_\text{bc}$ represents the number of boundary coordinates, $N_\text{mesh}$ corresponds to the number of coefficient coordinates, $N_\text{quad}$ specifies the number of velocity quadrature points.}\label{tab:rte_features}
+    \bicaption{DeepRTE 数据集特征。}{DeepRTE features. }\label{tab:rte_features}
 \end{table}
 
-在构造训练数据集时，每个样本包含：相空间坐标、入射边界函数 $I_-$、散射截面 $\mus$、总截面 $\mut$、相函数 $p$ 以及对应的辐射强度 $I$。这些物理量在理论上均为连续函数，在数值实现中则通过有限个离散采样点加以近似。表~\ref{tab:rte_features} 汇总了每个训练样本中包含的全部特征。
+在构造训练数据集时，每个样本包含：相空间坐标、入射边界函数 $I_-$、散射截面 $\mus$、总截面 $\mut$、相函数 $p$ 以及对应的辐射强度 $I$。这些物理量在理论上均为连续函数，在数值实现中则通过有限个离散采样点加以近似。表~\ref{tab:rte_features} 汇总了每个训练样本中包含的全部特征。在表中，$N_\text{coords}$ 表示相空间采样点数，$N_\text{bc}$ 为边界采样点数，$N_\text{mesh}$ 为系数采样点数，$N_\text{quad}$ 为角度求积点数。
 
 \paragraph{无网格采样}
 训练数据集通过完全无网格（mesh-free）的随机采样生成。所有特征的采样数量 $N_{\text{coords}}$、$N_{\text{bc}}$、$N_{\text{mesh}}$ 与 $N_{\text{quad}}$ 彼此独立，可根据问题复杂度与计算资源灵活调整。这一设计避免了对固定网格的依赖，使模型更易迁移到不同几何与系数分布下。
