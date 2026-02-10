@@ -116,7 +116,6 @@ $g$ 越接近 1，前向散射峰越尖锐。尽管本文主要以 H-G 相函数
     \caption{求积组的角度求积点和权重。$\zeta_i$ 和 $\theta_i$ 是速度空间的求积点，$c_i$ 和 $s_i$ 是对应的余弦和正弦值，$w_i$ 是求积权重。}\label{tab:quadrature}
 \end{table}
 
-
 \section{传统数值方法}
 
 本章回顾辐射输运方程的传统数值求解方法，其核心目的并非与神经网络方案对照，而是作为稳定可靠的基准求解器，在可控参数配置下批量生成高精度参考解。由此得到的参考解可直接构建神经网络方法训练所需的数据集与标签，并用于后续的验证与测试。
@@ -210,11 +209,11 @@ $g$ 越接近 1，前向散射峰越尖锐。尽管本文主要以 H-G 相函数
 \end{equation}
 即可得到连接单元四个边中心未知量的有限差分格式。
 
-\subsection{各向异性情形}
+\subsection{各向异性情形：源迭代方法}
 
-当考虑各向异性散射时，散射源项不仅依赖于标量通量，还依赖于角通量的高阶矩，导致角度耦合显著增强。为了解决这一困难，源迭代（Source Iteration, SI）成为一种标准的解法。SI 的核心思想是利用上一次迭代的辐射强度来计算散射项，将其视为固定的“源”，从而将复杂的积分-微分方程转化为一系列独立的微分方程求解。
+当考虑各向异性散射时，散射源项不仅依赖于标量通量，还依赖于角通量的高阶矩，导致角度耦合显著增强。为了解决这一困难，源迭代（source iteration, SI）成为一种标准的解法。SI 的核心思想是利用上一次迭代的辐射强度来计算散射项，将其视为固定的“源”，从而将复杂的积分-微分方程转化为一系列独立的微分方程求解。
 
-首先源迭代空间离散通常基于有限体积法（Finite Volume Method, FVM），以确保物理量的守恒性。该方法将空间区域划分为一系列网格单元，并在每个单元 $V_j$ 上对输运方程进行积分。利用高斯散度定理将流项转化为边界积分，从而建立单元平均辐射强度与边界辐射强度之间的平衡方程。
+首先源迭代空间离散通常基于有限体积法（finite volume method, FVM），以确保物理量的守恒性。该方法将空间区域划分为一系列网格单元，并在每个单元 $V_j$ 上对输运方程进行积分。利用高斯散度定理将流项转化为边界积分，从而建立单元平均辐射强度与边界辐射强度之间的平衡方程。
 
 在正交网格系统中，考虑沿某一坐标轴方向的输运过程。设该方向上的网格步长为 $h_j$，方向余弦为 $\xi_n$，则离散后的粒子平衡方程可表示为：
 \begin{equation}\label{eq:balance}
@@ -788,7 +787,6 @@ JAX 提供了 \texttt{jax.vmap}（Vectorizing Map）变换来实现自动向量�
 \end{equation}
 在底层实现中，\texttt{vmap} 并非简单的串行循环，而是将批次维度“下推”至基本运算算子中，生成高度优化的向量化指令，从而在单设备上实现高效的数据并行。
 
-
 \subsection{JAX 中的并行计算}
 JAX 采用单程序多数据（Single-Program Multi-Data, SPMD）的并行计算模型。在这种模式下，同一套计算逻辑（例如神经网络的前向传播函数）被分发到多个设备（如多个 GPU 或 TPU 核心）上并行执行，但每个设备处理的是输入数据的不同部分。这种机制使得大规模深度学习模型的训练能够高效地扩展到多设备集群上。
 
@@ -802,7 +800,7 @@ JAX 采用单程序多数据（Single-Program Multi-Data, SPMD）的并行计算
 
 本节将重点介绍该领域的两种主要范式：一是直接对解函数进行参数化建模的物理信息神经网络（PINN），旨在求解特定方程实例；二是致力于学习解算子的神经算子（Neural Operator）方法，侧重于学习从方程参数到解函数的映射规则。下文将分别阐述这两种方法的数学原理、算法实现及其应用特性。
 
-\subsection{物理信息神经网络 (PINN)}
+\subsection{物理信息神经网络}
 物理信息神经网络（Physics-Informed Neural Networks, PINN）是一种将偏微分方程（PDE）的物理约束直接嵌入到神经网络损失函数中的深度学习求解方法。其核心思想是利用神经网络强大的函数逼近能力来近似PDE的解，并通过自动微分技术精确计算方程中的微分算子，从而构造出包含物理残差的优化目标。
 
 PINN 主要用于解决如下形式的一般非线性偏微分方程：
@@ -830,7 +828,7 @@ PINN 的训练过程旨在同时最小化观测数据（或边界/初始条件�
 \end{equation}
 这里 $\{t_u^i, x_u^i, u^i\}_{i=1}^{N_u}$ 表示初始和边界上的训练数据点，$\{t_f^i, x_f^i\}_{i=1}^{N_f}$ 表示用于计算物理残差的配点（collocation points）。通过最小化该损失函数，网络参数 $\bm{\theta}$ 被优化，从而使得神经网络 $u(t, x)$ 既符合观测数据又满足物理方程约束。
 
-\subsection{神经算子 (Neural Operator)}
+\subsection{神经算子}
 神经算子（Neural Operator）代表了深度学习求解 PDE 的另一种范式。与 PINN 针对特定方程实例求解单一解 $u(t,x)$ 不同，神经算子旨在学习从一个函数空间到另一个函数空间的映射算子。
 
 从数学角度来看，设 $D \subset \mathbb{R}^d$ 为一个有界区域，$\mathcal{A}$ 和 $\mathcal{U}$ 分别为定义在 $D$ 上的巴拿赫空间（Banach spaces）。其中，$\mathcal{A}$ 通常对应于输入参数的函数空间（如初始条件、边界条件或方程系数），$\mathcal{U}$ 则对应于解函数的空间。神经算子的核心目标是学习一个非线性算子 $\mathcal{G}: \mathcal{A} \to \mathcal{U}$，使得对于任意输入函数 $a \in \mathcal{A}$，其映射得到的解 $u = \mathcal{G}(a)$ 满足特定的物理定律（通常由 PDE 描述）。具体而言，对于区域内的任意点 $x \in D$，解函数的值可表示为 $u(x) = (\mathcal{G}(a))(x)$。
@@ -845,6 +843,52 @@ PINN 的训练过程旨在同时最小化观测数据（或边界/初始条件�
 
 在神经算子的众多架构中，DeepONet 和 Fourier Neural Operator (FNO) 是最为典型且应用广泛的两种框架。
 
+\subsubsection{Fourier Neural Operator (FNO)}
+
+傅里叶神经算子（FNO）的设计灵感源于神经算子框架与傅里叶变换的结合。神经算子的核心是将函数到函数的映射分解为线性算子与非线性激活算子的交替组合，其结构与传统神经网络中线性层与激活函数的组合逻辑相似，但针对连续的函数输入，其线性变换被构造为积分算子。具体而言，对于一个输入函数 $ v(x) $，其线性映射输出 $ v'(x) $ 可表示为：
+
+\begin{equation}
+    v'(x) = \int \kappa(x, y) v(y) \, \mathrm{d}y + w\, v(x).
+\end{equation}
+
+其中，$\kappa(x, y)$ 为定义在域上的核函数，$w$ 为可学习的偏置权重。该积分形式能够捕捉函数间的全局依赖关系，但直接计算往往因核函数的稠密性而带来 $O(n^2)$ 的高计算复杂度。
+
+FNO 的核心创新在于将上述积分算子在傅里叶空间中进行参数化，从而借助傅里叶变换的优良性质大幅简化计算。傅里叶变换的核心优势在于：
+\begin{enumerate}
+    \item \textbf{卷积定理：}物理空间中的卷积运算转化为傅里叶空间中的点乘运算。
+    \item \textbf{微分算子的代数化：}对函数的求导运算转化为与频率变量 $k$ 的乘法运算。
+    \item \textbf{高效计算：}通过快速傅里叶变换（FFT），可将计算复杂度从 $O(n^2)$ 降至 $O(n \log n)$。
+\end{enumerate}
+
+傅里叶变换及其逆变换的定义为：
+\begin{equation}
+    \begin{aligned}
+        \hat{u}(k) & = \mathcal{F}(u)(k) = \int_{-\infty}^{\infty} u(x) e^{-ikx} \, \mathrm{d}x,                                \\
+        u(x)       & = \mathcal{F}^{-1}(\hat{u})(x) = \frac{1}{2\pi} \int_{-\infty}^{\infty} \hat{u}(k) e^{ikx} \, \mathrm{d}k.
+    \end{aligned}
+\end{equation}
+
+其中 $\mathcal{F}$ 表示傅里叶变换，$\hat{u}(k)$ 是函数 $u(x)$ 在频率域上的系数。基于此，FNO 将积分核 $\kappa$ 所实现的线性映射 $k(\cdot)$ 直接在傅里叶空间中参数化为：
+\begin{equation}
+    k(v)(x) = \mathcal{F}^{-1} \big( \mathcal{R}_\phi \cdot \mathcal{F}(v) \big)(x).
+\end{equation}
+
+这里，$\mathcal{R}_\phi$ 是傅里叶空间中一组可学习的复数权重，它作用于变换后的频率系数上，实现了高效的全局线性变换。
+
+一个完整的傅里叶层遵循“线性变换 + 非线性激活”的结构，其计算流程可分解为三步：
+\begin{enumerate}
+    \item \textbf{傅里叶变换：}对输入函数 $v_t(x)$ 进行傅里叶变换，得到其频率系数。
+    \item \textbf{频率域线性变换：}用可学习权重 $\mathcal{R}_\phi$ 与频率系数进行点乘。在实际实现中，为平衡计算精度与效率，通常只保留前 $k_{\text{max}}$ 个低频模态，截断高频部分，从而显著减少参数量并增强模型的稳定性。
+    \item \textbf{逆变换与激活：}将变换后的系数通过逆傅里叶变换映射回物理空间，再与一个局部的线性变换（通常由权重 $w$ 参数化，例如 $1\times 1$ 卷积）相结合，最后经过非线性激活函数 $\sigma$ 输出。
+\end{enumerate}
+
+该过程可概括为以下更新公式：
+\begin{equation}
+    v_{t+1}(x) = \sigma \big( w\, v_t(x) + k(v_t)(x) \big).
+\end{equation}
+
+通过堆叠多个这样的傅里叶层，FNO 能够逐步学习复杂的函数映射关系，在保持 $ O(n \log n) $ 的高计算效率的同时，有效捕捉函数间的长程依赖与全局特征，从而为求解偏微分方程等科学计算问题提供了一个强大的深度学习框架。
+
 \subsubsection{DeepONet}
 DeepONet 是由 Lu 等人基于算子通用逼近定理（Universal Approximation Theorem for Operators）提出的一种神经算子架构。该定理指出，对于非线性连续算子，可以通过单层神经网络进行任意精度的逼近。DeepONet 的核心设计包含两个子网络：
 \begin{itemize}
@@ -855,17 +899,49 @@ DeepONet 是由 Lu 等人基于算子通用逼近定理（Universal Approximatio
 \begin{equation}
     \mathcal{G}(a)(y) \approx \sum_{k=1}^p b_k(a) t_k(y) + b_0.
 \end{equation}
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/deeponet.pdf}
+    \bicaption{DeepONet 网络“branch–trunk” 结构示意图。}{Schematic of the DeepONet architecture.}
+    \label{fig:deeponet}
+\end{figure}
+
+图~\ref{fig:deeponet} 展示了其基本结构~\cite{wang2021learning}：输入函数在若干采样点处的取值传入 branch 网络得到低维特征表示，目标空间的位置变量传入 trunk 网络得到基函数值，最终将二者加权求和以获得算子输出。
 这种架构使得 DeepONet 能够灵活地处理不同的输入，并且在学习连续算子方面表现出良好的泛化能力。
 
-\subsubsection{Fourier Neural Operator (FNO)}
-Fourier Neural Operator (FNO) 是由 Li 等人提出的一种基于频域学习的神经算子。其数学基础在于，许多偏微分方程的解算子可以视为积分算子（如格林函数卷积），而在频域中，卷积操作转化为简单的乘法操作。
+\subsubsection{Multi-Input DeepONet（MIO）}
 
-FNO 的网络结构由若干个傅里叶层（Fourier Layer）堆叠而成。每一个傅里叶层的计算过程如下：
+Multi-Input DeepONet（MIO）~\cite{jin2022mionet}是 DeepONet 架构在处理多函数输入场景下的直接扩展。其核心设计继承了“分支-主干”结构，但将单一的 Branch Net 扩展为多个并行的 Branch Net，每个网络独立处理一个输入函数，最后通过融合模块将信息整合。
+
+设需逼近的算子涉及 $N$ 个输入函数 $a_1, a_2, \dots, a_N$ 和一个定义在坐标 $y$ 上的输出函数，MIO 的网络结构由三部分组成：
+
 \begin{enumerate}
-    \item 首先，对输入特征进行快速傅里叶变换（FFT），将其从物理空间变换到频域；
-    \item 在频域中，保留低频分量，并对其应用一个可学习的线性变换（即复数权重矩阵乘法）；
-    \item 最后，通过逆快速傅里叶变换（IFFT）将特征变换回物理空间，并加上一个残差连接（通常是 $1 \times 1$ 卷积）和非线性激活函数。
+    \item \textbf{多分支网络 (Multiple Branch Nets)：}对应 $N$ 个输入函数，设有 $N$ 个并行的分支网络。第 $i$ 个 Branch Net 将其输入函数 $a_i$ 在传感器点上的离散值编码为一个 $p$ 维特征向量：
+          \begin{equation*}
+              \mathbf{b}^{(i)} = \left[ b^{(i)}_1, b^{(i)}_2, \dots, b^{(i)}_p \right]^T = \text{Branch Net}_i (a_i).
+          \end{equation*}
+
+    \item \textbf{特征融合模块 (Fusion Module)：}将 $N$ 个分支特征向量 $\mathbf{b}^{(1)}, \dots, \mathbf{b}^{(N)}$ 合并为一个统一的 $p$ 维融合特征向量 $\mathbf{b}_{\text{fusion}}$。融合策略可根据任务设计，例如加权求和或逐元素乘法（Hadamard 积）。对于两个输入 $a_1=\mut$ 和 $a_2=I_-$ 的情形，若采用逐元素乘法，融合特征为：
+          \begin{equation*}
+              \mathbf{b}_{\text{fusion}} = \left[ b^{(1)}_1 b^{(2)}_1, \, b^{(1)}_2 b^{(2)}_2, \, \dots, \, b^{(1)}_p b^{(2)}_p \right]^T = \mathbf{b}^{(1)} \odot \mathbf{b}^{(2)}.
+          \end{equation*}
+
+    \item \textbf{主干网络 (Trunk Net)：}与 DeepONet 相同，共享的 Trunk Net 将输出域中的任意查询坐标 $y$ 编码为另一个 $p$ 维特征向量：
+          \begin{equation*}
+              \mathbf{t}(y) = \left[ t_1(y), t_2(y), \dots, t_p(y) \right]^T = \text{Trunk Net}(y).
+          \end{equation*}
 \end{enumerate}
 
+最终，算子在坐标 $ y $ 处的输出值，由融合特征向量与主干特征向量进行点积，并加上一个可学习的偏置 $ b_0 $ 得到：
+\begin{equation}
+    \mathcal{G}(a_1, \dots, a_N)(y) \approx \sum_{k=1}^p \left( b_{\text{fusion}, k} \right) \, t_k(y) + b_0 = \mathbf{b}_{\text{fusion}} \cdot \mathbf{t}(y) + b_0.
+    \label{eq:miodeeponet}
+\end{equation}
 
+当输入为两个且融合方式为逐元素乘法时，上式可具体化为如下的表达式：
+\begin{equation*}
+    \mathcal{G}(\mut, I_-)(\br, \bOmega) \approx \left( \text{Branch Net}_1(\mut) \odot \text{Branch Net}_2(I_-) \right) \cdot \text{Trunk Net}(\br, \bOmega) + b_0.
+\end{equation*}
 
+MIO 通过这种设计，不仅保留了 DeepONet 处理连续算子的泛化能力，更重要的是具备了同步编码与融合多源输入函数的能力，使其在多物理场耦合、参数化偏微分方程求解等需要联合多条件建模的复杂场景中表现出显著优势。

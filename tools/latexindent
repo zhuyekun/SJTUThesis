@@ -1,0 +1,7 @@
+#!/bin/zsh
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+export PERL5LIB="$REPO_ROOT/.latexindent-perl/local/lib/perl5${PERL5LIB:+:$PERL5LIB}"
+
+exec /Library/TeX/texbin/latexindent "$@"

@@ -12,6 +12,7 @@
 *.cb2
 .*.lb
 
+.latexindent-perl/*
 ## Intermediate documents:
 *.dvi
 *.xdv
