@@ -1,0 +1,562 @@
+\chapter{代码实现与工程优化}
+
+\section{开发环境与整体架构}
+本章所有代码均基于JAX AI 技术栈构建，核心依赖包括 JAX 数值计算框架、Flax 神经网络库、Optax 优化器库与 Orbax 检查点管理库，同时支持 NVIDIA GPU 硬件加速与 Docker 容器化部署，可兼容单机多卡与多机分布式训练场景。
+
+选择 JAX 作为核心框架，主要依托其三大核心优势：一是原生支持 自动微分（AutoDiff），可高效求解物理约束损失函数中的方向导数与梯度；二是集成XLA 即时编译，可将 Python 代码动态编译为优化的机器码，大幅提升计算效率；三是内置并行原语（\texttt {pmap}/\texttt {vmap}），可极简实现多 GPU 数据并行与模型并行，无需复杂的分布式通信代码。
+
+整体工程通过清晰的模块划分与标准化的接口定义，在保证不同算法组件独立实现与灵活调试的同时，实现了底层通用组件的高效复用。
+
+工程化层面重点突出以下优势：
+\begin{itemize}
+    \item 采用 \texttt {uv} 工具进行依赖管理，通过锁定依赖版本实现开发环境的一键快速复现；
+    \item 设计专门的数据处理模块，依托 Grain 库实现数据的预取、预缓存与序列化处理，大幅提升数据加载效率，尤其适配大规模训练数据集；
+    \item 充分利用 JAX 静态图优化特性，对核心算子与训练流程进行编译优化，显著降低计算延迟与内存占用；
+    \item 代码结构化清晰，各模块接口预设完善，支持灵活的模型替换与超参数配置；
+    \item 全流程脚本覆盖齐全，从数据生成、模型训练到推理验证均提供标准化执行脚本，简化实验操作流程。
+\end{itemize}
+
+\section{数据集构建与预处理}
+
+为便于实现与复现实验，我们将每个训练样本的输入与输出统一组织为若干张量特征，见表~\ref{tab:rte_features}。
+
+\begin{table}[!htp]
+    \centering
+    \begin{tabular}{lll}
+        \toprule
+        特征形状                                              & 描述                                                       \\
+        \midrule
+        \texttt{phase\_coords}: $[N_{\text{coords}},2d]$  & 相空间坐标 $(\br, \bOmega)$                                   \\
+        \texttt{boundary\_coords}: $[N_{\text{bc}},2d]$   & 边界相空间坐标 $(\br^{\prime}, \bOmega^{\prime})$               \\
+        \texttt{boundary\_weights}: $[N_{\text{bc}}]$     & 边界求积权重 $\omega_i$                                        \\
+        \texttt{position\_coords}: $[N_{\text{mesh}},2d]$ & 系数采样网格点 $(\br^{\text{mesh}})$                            \\
+        \texttt{velocity\_coords}: $[N_{\text{quad}},2d]$ & 角度求积点 $\bOmega^{*}$                                      \\
+        \texttt{velocity\_weights}: $[N_{\text{quad}}]$   & 角度求积权重 $\omega_i$                                        \\
+        \texttt{boundary}: $[N_{\text{bc}}]$              & 边界入射强度 $I(\br^{\prime}, \bOmega^{\prime})$               \\
+        \texttt{mu}: $[N_{\text{mesh}},2]$                & 截面 $\mus(\br^{\text{mesh}})$ 与 $\mut(\br^{\text{mesh}})$ \\
+        \texttt{scattering\_kernel}: $[N_{\text{quad}}]$  & 散射核 $p(\bOmega, \bOmega^*)$                              \\
+        \bottomrule
+    \end{tabular}
+    \bicaption{DeepRTE 数据集特征。}{DeepRTE features. }\label{tab:rte_features}
+\end{table}
+
+在构造训练数据集时，每个样本包含：相空间坐标、入射边界函数 $I_-$、散射截面 $\mus$、总截面 $\mut$、相函数 $p$ 以及对应的辐射强度 $I$。这些物理量在理论上均为连续函数，在数值实现中则通过有限个离散采样点加以近似。表~\ref{tab:rte_features} 汇总了每个训练样本中包含的全部特征。在表中，$N_\text{coords}$ 表示相空间采样点数，$N_\text{bc}$ 为边界采样点数，$N_\text{mesh}$ 为系数采样点数，$N_\text{quad}$ 为角度求积点数。
+
+训练数据集通过完全无网格（mesh-free）的随机采样生成。所有特征的采样数量 $N_{\text{coords}}$、$N_{\text{bc}}$、$N_{\text{mesh}}$ 与 $N_{\text{quad}}$ 彼此独立，可根据问题复杂度与计算资源灵活调整。这一设计避免了对固定网格的依赖，使模型更易迁移到不同几何与系数分布下。
+
+数据预处理与加载流程基于Grain库构建，核心步骤包括：首先，根据物理场景参数生成或从传统数值解中抽取上述各类数据点，完成原始数据的清洗、坐标归一化与格式统一；其次，将预处理后的数据序列化为高效的二进制格式，降低磁盘IO开销并提升随机访问效率；最后，通过Grain构建端到端数据加载流水线，集成数据打乱、动态批次划分、设备预取与多进程缓存功能，实现训练过程中数据的低延迟、高吞吐供应。整个流程充分适配JAX的向量化与并行特性，可无缝对接单机多卡与分布式训练场景。
+
+高效的数据集构建与预处理流程具有多重意义：一是标准化的数据划分与物理约束格式保证了物理信息的严格落地，为模型训练提供了清晰的多任务监督信号；二是基于Grain的流水线加载大幅提升了数据吞吐效率，尤其在大规模方程残差点场景下可有效消除数据加载瓶颈，释放GPU计算潜力；三是序列化的数据存储与可配置的加载流程提升了实验的可复现性与灵活性，支持不同几何构型、光学参数场景下的快速切换与对比验证。
+
+\section{DeepRTE 训练实现}
+
+本节系统阐述DeepRTE模型的代码实现与训练流程，核心思想是通过神经网络显式建模辐射输运方程的格林函数解算子，基于JAX AI技术栈构建物理驱动训练框架。整体实现遵循模块化、可扩展设计，将网络结构、核心物理算子、训练逻辑与并行策略解耦，在严格落地物理约束的同时，充分发挥JAX的自动微分、即时编译与并行计算优势。
+
+\subsection{整体训练流程}
+
+训练流程围绕物理约束损失函数展开，核心步骤包括参数初始化、前向传播、损失计算、反向传播与参数更新。损失函数由边界条件损失与方程残差损失构成，分别约束模型在边界上的精度与在域内满足辐射输运方程的程度。
+
+\begin{algorithm}[htbp]
+    \caption{DeepRTE完整训练流程}
+    \label{alg:training}
+    \SetAlgoLined
+    \KwIn{$\text{config}, \text{seed}$}
+    \KwOut{$\text{state.params}$}
+
+    \BlankLine
+
+    \emph{初始化随机数种子与模型}\;
+    $\text{rng} \gets \texttt{PRNGKey}(\text{seed})$\;
+    $\text{model} \gets \texttt{DeepRTE}(\text{config.model\_params})$\;
+    $\text{params} \gets \text{model.init}(\text{rng}, \text{example\_batch})$\;
+
+    \emph{构造优化器与训练状态}\;
+    $\text{tx} \gets \texttt{AdamW}(\text{config.optimizer\_params})$\;
+    $\text{state} \gets \texttt{TrainState.create}(\text{apply\_fn}=\text{model.apply},\, \text{params}=\text{params},\, \text{tx}=\text{tx})$\;
+
+    \emph{构造数据加载器与检查点管理器}\;
+    $\text{train\_ds} \gets \texttt{GrainDataLoader}(\text{config.data\_params})$\;
+    $\text{checkpointer} \gets \texttt{OrbaxCheckpointer}(\text{config.checkpoint\_dir})$\;
+
+    \For{$\text{epoch} \gets 1$ \KwTo $\text{config.epochs}$}{
+        \ForEach{$\text{batch} \in \text{train\_ds}$}{
+            \emph{前向传播并计算物理约束损失}\;
+            $\text{loss\_fn} \gets \lambda\,\text{params}:\; \texttt{PhysicsLoss}(\text{state.apply\_fn}(\text{params}, \text{batch}),\, \text{batch})$\;
+            \emph{反向传播并更新参数}\;
+            $\text{grads} \gets \texttt{grad}(\text{loss\_fn})(\text{state.params})$\;
+            $\text{state} \gets \text{state.apply\_gradients}(\text{grads}=\text{grads})$\;
+        }
+        \emph{保存检查点}\;
+        $\text{checkpointer.save}(\text{state}, \text{epoch})$\;
+    }
+
+    \Return{$\text{state.params}$}\;
+\end{algorithm}
+
+\subsection{网络模块代码结构}
+
+DeepRTE的网络结构围绕格林函数解算子建模展开，通过级联的衰减模块与散射模块模拟辐射输运物理过程。网络输入特征按物理功能分为两类，分别支撑衰减模块与散射模块计算：
+
+第一类特征输入至衰减模块，用于显式建模解算子对宏观截面的依赖，具体包括：
+\begin{itemize}
+    \item $(\boldsymbol{r},\boldsymbol{\Omega})$：待评估解的相空间坐标；
+    \item $(\boldsymbol{r}',\boldsymbol{\Omega}')$：边界$\Gamma_-$ 的相空间坐标，用于边界积分；
+    \item $\{{(\mu_t^{\text{mesh}})}_i=\mu_t(\boldsymbol{r}^{\text{mesh}}_i)\}$，$\{{(\mu_s^{\text{mesh}})}_i=\mu_s(\boldsymbol{r}^{\text{mesh}}_i)\}$，$\{\boldsymbol{r}^{\text{mesh}}_i\}$：总截面系数和散射截面系数在空间网格点上的取值，以及对应空间网格点坐标。网格既可以是均匀的，也可以是结构化或非结构化的稀疏网格。
+\end{itemize}
+
+衰减模块的输出随后与第二类特征结合，输入至散射模块以模拟固定点迭代过程，第二类特征具体包括：
+\begin{itemize}
+    \item  $\{p(\boldsymbol{\Omega}, \boldsymbol{\Omega}^*_i)\}$，$\{\omega_i\}$：在任意角度 $\boldsymbol{\Omega}$、求积点 $\boldsymbol{\Omega}^*_i$ 上的相函数 $p$，以及对应的求积权重 $\omega_i$；
+    \item  $\{p(\boldsymbol{\Omega}^*_i, \boldsymbol{\Omega}^*_j)\}$，$\{\omega_j\}$：在求积点 $(\boldsymbol{\Omega}^*_i, \boldsymbol{\Omega}^*_j)$ 上的相函数 $p$，用于网络中残差连接及多步散射更新的计算。
+\end{itemize}
+
+网络整体前向流程为：首先通过衰减模块提取包含衰减效应的物理特征，随后通过散射模块模拟多步散射的迭代更新，最终将散射模块输出通过线性层投影为标量格林函数 $G^{\text{NN}}$；将 $G^{\text{NN}}$ 与边界条件 $I_{-}(\boldsymbol{r}',\boldsymbol{\Omega}')$ 相乘，并在边界相空间坐标 $(\boldsymbol{r}',\boldsymbol{\Omega}')$ 上积分，即可得到任意相空间点 $(\boldsymbol{r},\boldsymbol{\Omega})$ 上的解 $I$。
+
+\subsection{核心算子实现}
+
+衰减模块与散射模块是DeepRTE贴合辐射输运物理规律的核心算子，所有模块均基于JAX与Flax实现，通过向量化与即时编译优化计算效率。
+
+\paragraph{衰减模块} 衰减模块整合相对位置编码、光学深度网络与多层感知机，输出包含衰减效应的潜在特征。实现中首先通过相对位置编码将空间网格点转换为沿射线方向的局部坐标系，再由光学深度网络基于多头注意力机制学习沿射线方向的光学深度特征，最后将光学深度特征与相空间坐标拼接后输入多层感知机，通过非线性变换投影至模型维度的输出特征。
+
+\begin{algorithm}[htp!]
+    \caption{衰减模块（Attenuation Module）}\label{alg:code-attenuation-module}
+    \SetAlgoLined
+    \KwIn{$\boldsymbol{r},\boldsymbol{\Omega},\boldsymbol{r}^{\prime},\boldsymbol{\Omega}^{\prime},\{\boldsymbol{r}_i^{\text{mesh}}\},\{{(\mu_t^{\text{mesh}})}_i\},\{{(\mu_s^{\text{mesh}})}_i\}, N_{\text{mlp}}=4,d_{\text{mlp}}=128,d_{\text{model}}=16$}
+    \KwOut{$\bm{g}$}
+
+    \BlankLine
+
+    \emph{计算网格点的相对位置编码}\;
+    \ForEach{$\boldsymbol{r}_i^{\text{mesh}}$}{
+    ${(\boldsymbol{r}^\text{mesh}_{\text{local}})}_i, m_i = \texttt{RelativePositionEncoding}(\boldsymbol{r}, \boldsymbol{\Omega}, \boldsymbol{r}_i^{\text{mesh}})$\;
+    }
+
+    \emph{利用光学深度网络计算特征}\;
+    $\tau_{-}^{\text{NN}} = \texttt{OpticalDepthNet}(\boldsymbol{r},\boldsymbol{\Omega},\{{(\boldsymbol{r}^\text{mesh}_{\text{local}})}_i\}, \{m_i\}, \{{(\mu_t^{\text{mesh}})}_i\},\{{(\mu_s^{\text{mesh}})}_i\}, d_k=12, H=2)$\;
+    $\bm{z} = \texttt{concat}(\boldsymbol{r}, \boldsymbol{\Omega}, \boldsymbol{r}^{\prime}, \boldsymbol{\Omega}^{\prime}, e^{-\tau_{-}^{\text{NN}}})$\;
+
+    \emph{通过多层感知机处理特征, $\bm{z} \in \mathbb{R}^{d_{\text{mlp}}}$}\;
+    \For{$l\in[1,\ldots,N_{\text{mlp}-1}]$}{
+    $\bm{z}\gets\texttt{tanh}(\texttt{Linear}(\bm{z}))$\;
+    }
+
+    \emph{将特征投影到输出空间, $\bm{g} \in \mathbb{R}^{d_{\text{model}}}$}\;
+    $\bm{g} = \texttt{Linear}(\bm{z})$\;
+
+    \Return{$\bm{g}$}\;
+\end{algorithm}
+
+其中相对位置编码（Relative Position Encoding）用于将空间网格点转换为沿射线方向的局部坐标系，为光学深度网络提供物理对齐的输入特征，具体算法如下：
+
+\begin{algorithm}[htp!]
+    \caption{相对位置编码（Relative Position Encoding）}\label{alg:code-relative-position-encoding}
+    \SetAlgoLined
+    \KwIn{$\boldsymbol{r}, \boldsymbol{\Omega}, \tilde{\boldsymbol{r}}$}
+    \KwOut{$(r_\text{local},\theta_\text{local}), m$}
+
+    \emph{计算相对位置向量}\;
+    $\boldsymbol{r}_{\text{rel}} = \boldsymbol{r} - \tilde{\boldsymbol{r}}$\;
+
+    \emph{计算局部坐标系下的分量}\;
+    $r_{\text{local}} =  \boldsymbol{r}_{\text{rel}} \cdot \boldsymbol{\Omega}$\;
+    $\theta_{\text{local}} = r_{\text{local}}/\|\boldsymbol{r}_{\text{local}}\|$\;
+
+    \emph{生成沿特征线的掩码}\;
+    $m = -10^{10} \text{ if } s_\text{local} < 0 \text{ else } 0$\;
+
+    \Return{$(r_\text{local},\theta_\text{local}), m$}\;
+\end{algorithm}
+
+光学深度网络（Optical Depth Network）基于多头注意力机制，从网格点的宏观截面中学习沿射线方向的光学深度特征，具体算法如下：
+
+\begin{algorithm}[htp!]
+    \caption{光学深度网络（Optical Depth Network）}\label{alg:code-optical-depth-net}
+    \SetAlgoLined
+    \KwIn{$\boldsymbol{r}, \boldsymbol{\Omega}, \{{(\boldsymbol{r}^\text{mesh}_{\text{local}})}_i\}, \{m_i\}, \{{(\mu_t^{\text{mesh}})}_i\}, \{{(\mu_s^{\text{mesh}})}_i\}, d_k=12, H=2$}
+    \KwOut{$\tau_{-}$}
+
+    \emph{将输入投影到多头注意力空间, $\boldsymbol{q}^h, \boldsymbol{k}_i^h \in \mathbb{R}^{d_k}, \boldsymbol{v}_i^h \in \mathbb{R}^{d_v}$}\;
+    $\boldsymbol{q}^h = \texttt{LinearNoBias}((\boldsymbol{r},\boldsymbol{\Omega}))$\;
+    $\boldsymbol{k}_i^h = \texttt{LinearNoBias}\left({(\boldsymbol{r}^\text{mesh}_{\text{local}})}_i\right)$\;
+    $\boldsymbol{v}_i^h = \texttt{LinearNoBias}\left(\texttt{concat}\left({(\mu_t^{\text{mesh}})}_i,{(\mu_s^{\text{mesh}})}_i\right)\right)$\;
+
+    \emph{计算注意力权重并聚合值, $\boldsymbol{\tau}^h\in\mathbb{R}^{d_v}$}\;
+    $a_{i}^h = \texttt{softmax}_i\left(\frac{1}{\sqrt{d_k}}{(\boldsymbol{q}^h)}^{\transpose}\boldsymbol{k}_i^h+m_i\right)$\;
+    $\boldsymbol{\tau}^h = \sum_i a_{i}^h \boldsymbol{v}_i^h$\;
+
+    \emph{拼接多头输出并投影, $\tau_{-}\in \mathbb{R}^{d_\tau}$}\;
+    $\tau_{-} = \texttt{LinearNoBias}\left(\texttt{concat}_h(\boldsymbol{\tau}^h)\right)$\;
+
+    \Return{$\tau_{-}$}\;
+\end{algorithm}
+
+\paragraph{散射模块} 散射模块通过级联散射块模拟多步散射的固定点迭代过程，并引入残差连接保证梯度稳定。实现中首先保存角度求积点处的初始衰减特征，随后通过多次迭代应用散射块，并将初始特征作为残差连接加入每一步更新，模拟散射级数展开；最终将求积点处的特征聚合至待评估角度，得到更新后的潜在特征。
+
+\begin{algorithm}[htp!]
+    \caption{散射模块（Scattering Module）}\label{alg:code-scattering-module}
+    \SetAlgoLined
+    \KwIn{$\bm{g}, \{\bm{g}^*_j\}, \{p(\boldsymbol{\Omega},\boldsymbol{\Omega}^*_i)\},\{p(\boldsymbol{\Omega}^*_i,\boldsymbol{\Omega}^*_j)\}, \{w_j\}, N_s=2$}
+    \KwOut{$\bm{g}$}
+
+    \emph{保存初始状态用于残差连接, ${(\bm{g}^*_j)}^{\text{init}}\in \mathbb{R}^{d_{\text{model}}}$}\;
+    ${(\bm{g}^*_j)}^{\text{init}} = \bm{g}^*_j$\;
+
+    \emph{执行带有跳跃连接的散射块迭代}\;
+    \For{$\ell\in[0,\ldots,N_\ell-2]$}{
+    \emph{添加初始值以模拟级数展开, $\bm{g}^*_i\in \mathbb{R}^{d_{\text{model}}}$}\;
+    $\bm{g}^*_i\gets{(\bm{g}^*_i)}^{\text{init}} + \texttt{ScatteringBlock}_\ell(\{\bm{g}^*_j\},\{p(\boldsymbol{\Omega}^*_i,\boldsymbol{\Omega}^*_j), \{w_j\} \}) $\;
+    }
+
+    $\bm{g}\mathrel{+}=\texttt{ScatteringBlock}_{N_\ell-1}(\{\bm{g}^*_i\},\{p(\boldsymbol{\Omega},\boldsymbol{\Omega}^*_i)\}, \{\omega_i\})$ \hfill \emph{$\bm{g}\in \mathbb{R}^{d_{\text{model}}}$} \;
+
+    \Return{$\bm{g}$}\;
+\end{algorithm}
+
+其中散射块（Scattering Block）是散射模块的基本单元，通过加权求和近似散射积分，并应用非线性变换与层归一化，具体算法如下：
+
+\begin{algorithm}[htp!]
+    \caption{散射块（Scattering Block）}\label{alg:code-scattering-block}
+    \SetAlgoLined
+    \KwIn{$\{\bm{g}_i\}, \{p_i\}, \{\omega_i\}, d_{\text{model}}=16$}
+    \KwOut{$\bm{g}$}
+
+    \emph{通过加权求和近似数值积分}\;
+    $\bm{g}  = \sum_i \omega_i p_i \bm{g}_i$\;
+
+    \emph{应用线性变换和激活函数, $\bm{g}\in \mathbb{R}^{d_{\text{model}}}$}\;
+    $\bm{g}\gets \texttt{tanh}\left(\texttt{Linear}( \bm{g})\right)$\;
+
+    \emph{应用层归一化}\;
+    $\bm{g} \gets \texttt{LayerNorm}(\bm{g})$\;
+
+    \Return{$\bm{g}$}\;
+\end{algorithm}
+
+\paragraph{格林函数前向传播} 格林函数的计算是整个前向传播的核心，首先分别计算待评估点与角度求积点处的衰减特征，随后通过散射模块更新特征，最终投影为标量格林函数。
+
+\begin{algorithm}[htp!]
+    \caption{格林函数}\label{alg:code-green-function}
+    \SetAlgoLined
+    \KwIn{$\boldsymbol{r},\boldsymbol{\Omega},\boldsymbol{r}^{\prime},\boldsymbol{\Omega}^{\prime},\{\boldsymbol{r}_i^{\text{mesh}}\}, \{{(\mu_t^{\text{mesh}})}_i\},\{{(\mu_s^{\text{mesh}})}_i\},\{p(\boldsymbol{\Omega},\boldsymbol{\Omega}^*_i)\},\{p(\boldsymbol{\Omega}^*_i,\boldsymbol{\Omega}^*_j)\}, \{\omega_j\}$}
+    \KwOut{$g$}
+
+    \BlankLine
+
+    \emph{计算衰减模块的输出$\bm{g}\in \mathbb{R}^{d_{\text{model}}}$}\;
+    $\bm{g}=\texttt{AttenuationModule}(\boldsymbol{r},\boldsymbol{\Omega},\boldsymbol{r}^{\prime},\boldsymbol{\Omega}^{\prime},\{\boldsymbol{r}_i^{\text{mesh}}\},\{{(\mu_t^{\text{mesh}})}_i\},\{{(\mu_s^{\text{mesh}})}_i\})$\;
+
+    \emph{计算角度求积点处的衰减模块输出$\bm{g}^*_j\in \mathbb{R}^{d_{\text{model}}}$}\;
+    $\{\bm{g}^*_j\}=\texttt{AttenuationModule}(\boldsymbol{r},\{\boldsymbol{\Omega}_j^*\},\boldsymbol{r}^{\prime},\boldsymbol{\Omega}^{\prime},\{\boldsymbol{r}_i^{\mathrm{mesh}}\},\{{(\mu_t^{\mathrm{mesh}})}_i\}, \{{(\mu_s^{\mathrm{mesh}})}_i\})$\;
+
+    \emph{调用散射模块模拟迭代更新$\bm{g}\in \mathbb{R}^{d_{\text{model}}}$}\;
+    $\bm{g}\gets\texttt{ScatteringModule}(\bm{g}, \{\bm{g}^*_j\}, \{p(\boldsymbol{\Omega},\boldsymbol{\Omega}^*_i)\},\{p(\boldsymbol{\Omega}^*_i,\boldsymbol{\Omega}^*_j)\}, \{\omega_j\})$\;
+
+    \emph{将潜在特征向量投影至标量格林函数$g\in\mathbb{R}$}\;
+    $g = \texttt{LinearNoBias}(\bm{g})$\;
+
+    \Return{$g$}\;
+\end{algorithm}
+
+得到格林函数后，通过边界积分即可得到任意相空间点的辐射强度解：
+$$
+    I(\boldsymbol{r},\boldsymbol{\Omega}) = \int_{\Gamma_-} G^{\text{NN}}(\boldsymbol{r},\boldsymbol{\Omega},\boldsymbol{r}',\boldsymbol{\Omega}') I_-(\boldsymbol{r}',\boldsymbol{\Omega}') d\boldsymbol{r}' d\boldsymbol{\Omega}'
+$$
+
+\subsection{多GPU并行策略}
+
+DeepRTE充分利用JAX的并行原语实现高效多GPU训练，核心采用数据并行策略，结合\texttt{pmap}与设备分片（Sharding）技术实现计算与数据的高效分布。
+
+实现中，首先通过\texttt{jax.device\_count()}获取可用GPU设备，将训练数据沿批次维度均分到各设备，确保每个设备处理部分边界积分与方程残差点的计算；其次，利用\texttt{jax.pmap}将训练步骤函数映射到多设备，自动实现数据的设备间分发与梯度的聚合，格林函数的批量计算通过\texttt{jax.vmap}在设备内进一步向量化；最后，通过JAX的设备分片注解（\texttt{jax.sharding}）优化大模型参数的存储与访问，减少设备间通信开销。整个并行流程无需手动编写分布式通信代码，JAX自动处理设备同步与梯度聚合，在单机多卡场景下可实现接近线性的加速比。
+
+\section{EfficientRTE 训练实现}
+
+本节系统阐述EfficientRTE模型的代码实现与训练流程，核心思想是通过基函数展开与编码器-解码器架构，将含源项辐射输运方程的高维积分求解转化为低维向量运算，基于JAX AI技术栈构建高效训练框架。整体实现复用DeepRTE的物理算子模块，新增编码器模块与线性映射层，在保持高精度的同时显著降低计算复杂度。
+
+\subsection{整体训练流程}
+
+训练流程分为编码器预训练、Gram矩阵计算与解码器训练三个阶段，核心围绕源项重构损失与辐射强度拟合损失展开。
+
+\begin{algorithm}[htbp]
+    \caption{EfficientRTE完整训练流程}
+    \label{alg:training_efficientrte}
+    \SetAlgoLined
+    \KwIn{$\text{config}, \text{seed}$}
+    \KwOut{$\text{encoder\_params}, \text{decoder\_params}, \boldsymbol{W}$}
+
+    \BlankLine
+
+    \emph{初始化随机数种子与模型}\;
+    $\text{rng} \gets \texttt{PRNGKey}(\text{seed})$\;
+    $\text{encoder} \gets \texttt{Encoder}(\text{config.encoder\_params})$\;
+    $\text{decoder} \gets \texttt{Decoder}(\text{config.decoder\_params})$\;
+    $\text{encoder\_params} \gets \text{encoder.init}(\text{rng}, \text{example\_source})$\;
+    $\text{decoder\_params} \gets \text{decoder.init}(\text{rng}, \text{example\_phase\_space})$\;
+
+    \emph{构造优化器与训练状态}\;
+    $\text{tx\_enc} \gets \texttt{AdamW}(\text{config.encoder\_optimizer\_params})$\;
+    $\text{tx\_dec} \gets \texttt{AdamW}(\text{config.decoder\_optimizer\_params})$\;
+    $\text{enc\_state} \gets \texttt{TrainState.create}(\text{apply\_fn}=\text{encoder.apply},\, \text{params}=\text{encoder\_params},\, \text{tx}=\text{tx\_enc})$\;
+    $\text{dec\_state} \gets \texttt{TrainState.create}(\text{apply\_fn}=\text{decoder.apply},\, \text{params}=\text{decoder\_params},\, \text{tx}=\text{tx\_dec})$\;
+
+    \emph{构造数据加载器与检查点管理器}\;
+    $\text{train\_ds} \gets \texttt{GrainDataLoader}(\text{config.data\_params})$\;
+    $\text{checkpointer} \gets \texttt{OrbaxCheckpointer}(\text{config.checkpoint\_dir})$\;
+
+    \emph{阶段1：预训练编码器}\;
+    \For{$\text{epoch} \gets 1$ \KwTo $\text{config.encoder\_epochs}$}{
+        \ForEach{$\text{batch} \in \text{train\_ds}$}{
+            \emph{前向传播并计算源项重构损失}\;
+            $\text{loss\_fn\_enc} \gets \lambda\,\text{params}:\; \texttt{SourceReconLoss}(\text{enc\_state.apply\_fn}(\text{params}, \text{batch}),\, \text{batch})$\;
+            \emph{反向传播并更新编码器参数}\;
+            $\text{grads\_enc} \gets \texttt{grad}(\text{loss\_fn\_enc})(\text{enc\_state.params})$\;
+            $\text{enc\_state} \gets \text{enc\_state.apply\_gradients}(\text{grads}=\text{grads\_enc})$\;
+        }
+    }
+
+    \emph{阶段2：计算Gram矩阵}\;
+    $\boldsymbol{W} \gets \texttt{ComputeGramMatrix}(\text{enc\_state.apply\_fn}, \text{enc\_state.params}, \text{config.grid\_params})$\;
+
+    \emph{阶段3：训练解码器（固定编码器参数）}\;
+    \For{$\text{epoch} \gets 1$ \KwTo $\text{config.decoder\_epochs}$}{
+    \ForEach{$\text{batch} \in \text{train\_ds}$}{
+    \emph{前向传播：先通过编码器得到源项系数}\;
+    $\boldsymbol{q}_{\text{batch}} \gets \text{enc\_state.apply\_fn}(\text{enc\_state.params}, \text{batch})$\;
+    \emph{定义辐射强度拟合损失函数}\;
+    $\text{loss\_fn\_dec} \gets \lambda\,\text{params}:\; \texttt{IntensityFitLoss}(\text{dec\_state.apply\_fn}(\text{params}, \text{batch}),\, \boldsymbol{q}_{\text{batch}},\, \boldsymbol{W},\, \text{batch})$\;
+    \emph{反向传播并更新解码器参数}\;
+    $\text{grads\_dec} \gets \texttt{grad}(\text{loss\_fn\_dec})(\text{dec\_state.params})$\;
+    $\text{dec\_state} \gets \text{dec\_state.apply\_gradients}(\text{grads}=\text{grads\_dec})$\;
+    }
+    \emph{保存检查点}\;
+    $\text{checkpointer.save}((\text{enc\_state}, \text{dec\_state}, \boldsymbol{W}), \text{epoch})$\;
+    }
+
+    \Return{$\text{enc\_state.params}, \text{dec\_state.params}, \boldsymbol{W}$}\;
+\end{algorithm}
+
+\subsection{网络模块代码结构}
+
+EfficientRTE的网络结构在DeepRTE基础上扩展，新增编码器模块学习源域基函数，解码器复用DeepRTE的衰减与散射模块并新增线性映射层。代码组织遵循模块化设计。
+
+网络整体前向流程为：首先通过编码器将源项投影为低维系数向量，随后通过解码器学习格林函数的基函数系数，最终通过低维向量乘积得到辐射强度解。
+
+\subsection{核心算子实现}
+
+编码器、解码器是EfficientRTE的核心算子，其中解码器复用DeepRTE的物理算子并扩展线性映射层，所有模块均基于JAX与Flax实现。
+
+\paragraph{编码器} 编码器通过多层感知机学习源域基函数，将任意体源项映射为低维系数向量。实现中首先将源域相空间坐标输入多层感知机，输出 $K$ 维基函数值，再通过数值积分计算源项在基函数上的展开系数。
+
+\begin{algorithm}[htp!]
+    \caption{编码器（Encoder）}\label{alg:encoder}
+    \SetAlgoLined
+    \KwIn{$q(\boldsymbol{r}',\boldsymbol{\Omega}'), \{\boldsymbol{r}'_i, \boldsymbol{\Omega}'_i\}, \{w'_i\}, K=128, N_{\text{mlp}}=4, d_{\text{mlp}}=256$}
+    \KwOut{$\boldsymbol{q}, \{\phi_k(\boldsymbol{r}'_i, \boldsymbol{\Omega}'_i)\}$}
+
+    \emph{通过多层感知机计算基函数值}\;
+    \ForEach{$(\boldsymbol{r}'_i, \boldsymbol{\Omega}'_i)$}{
+    $\bm{z} \gets \texttt{concat}(\boldsymbol{r}'_i, \boldsymbol{\Omega}'_i)$\;
+    \For{$l\in[1,\ldots,N_{\text{mlp}-1}]$}{
+    $\bm{z}\gets\texttt{tanh}(\texttt{Linear}(\bm{z}))$\;
+    }
+    $\{\phi_k(\boldsymbol{r}'_i, \boldsymbol{\Omega}'_i)\}_{k=1}^K \gets \texttt{Linear}(\bm{z})$\;
+    }
+
+    \emph{通过数值积分计算源项系数}\;
+    \For{$k\in[1,\ldots,K]$}{
+        $q_k \gets \sum_i w'_i \cdot q(\boldsymbol{r}'_i, \boldsymbol{\Omega}'_i) \cdot \phi_k(\boldsymbol{r}'_i, \boldsymbol{\Omega}'_i)$\;
+    }
+
+    \Return{$\boldsymbol{q}=[q_1,\dots,q_K], \{\phi_k(\boldsymbol{r}'_i, \boldsymbol{\Omega}'_i)\}$}\;
+\end{algorithm}
+
+\paragraph{衰减模块} 衰减模块与DeepRTE保持一致，整合相对位置编码、光学深度网络与多层感知机，输出包含衰减效应的潜在特征。其中相对位置编码与光学深度网络的实现与DeepRTE完全一致，详见算法\ref{alg:code-relative-position-encoding}与\ref{alg:code-optical-depth-net}。
+
+\paragraph{散射模块} 散射模块与DeepRTE保持一致，通过级联散射块模拟多步散射的固定点迭代过程，并引入残差连接保证梯度稳定。
+
+其中散射块的实现与DeepRTE完全一致，详见算法\ref{alg:code-scattering-block}。
+
+\paragraph{格林函数系数映射} 解码器的最后一步通过线性层将散射模块输出的模型维度特征映射为 $K$ 维基函数系数，实现格林函数的基函数展开。
+
+\begin{algorithm}[htp!]
+    \caption{格林函数系数映射（Green Function Coefficient Projection）}\label{alg:green_projection}
+    \SetAlgoLined
+    \KwIn{$\bm{g} \in \mathbb{R}^{d_{\text{model}}}, K=128$}
+    \KwOut{$\boldsymbol{G}^{\text{NN}} \in \mathbb{R}^K$}
+
+    \emph{通过线性层映射到基函数维度}\;
+    $\boldsymbol{G}^{\text{NN}} = \texttt{LinearNoBias}(\bm{g})$\;
+
+    \Return{$\boldsymbol{G}^{\text{NN}}$}\;
+\end{algorithm}
+
+\subsection{格林函数前向传播与推理}
+
+格林函数的前向传播分为解码器特征提取与系数映射两步，推理阶段则结合编码器源项系数与Gram矩阵，通过低维向量乘积快速得到辐射强度解。
+
+\begin{algorithm}[htp!]
+    \caption{格林函数前向传播与推理}\label{alg:green_inference}
+    \SetAlgoLined
+    \KwIn{$\boldsymbol{r},\boldsymbol{\Omega},\{\boldsymbol{r}_i^{\text{mesh}}\}, \{{(\mu_t^{\text{mesh}})}_i\},\{{(\mu_s^{\text{mesh}})}_i\},\{p(\boldsymbol{\Omega},\boldsymbol{\Omega}^*_i)\},\{p(\boldsymbol{\Omega}^*_i,\boldsymbol{\Omega}^*_j)\}, \{\omega_j\}, q(\boldsymbol{r}',\boldsymbol{\Omega}'), \boldsymbol{W}$}
+    \KwOut{$I(\boldsymbol{r},\boldsymbol{\Omega})$}
+
+    \BlankLine
+
+    \emph{步骤1：编码器计算源项系数}\;
+    $\boldsymbol{q}, \{\phi_k\} = \texttt{Encoder}(q(\boldsymbol{r}',\boldsymbol{\Omega}'))$\;
+
+    \emph{步骤2：解码器计算格林函数系数}\;
+    $\bm{g}=\texttt{AttenuationModule}(\boldsymbol{r},\boldsymbol{\Omega},\{\boldsymbol{r}_i^{\text{mesh}}\},\{{(\mu_t^{\text{mesh}})}_i\},\{{(\mu_s^{\text{mesh}})}_i\})$\;
+    $\{\bm{g}^*_j\}=\texttt{AttenuationModule}(\boldsymbol{r},\{\boldsymbol{\Omega}_j^*\},\{\boldsymbol{r}_i^{\mathrm{mesh}}\},\{{(\mu_t^{\mathrm{mesh}})}_i\}, \{{(\mu_s^{\mathrm{mesh}})}_i\})$\;
+    $\bm{g}\gets\texttt{ScatteringModule}(\bm{g}, \{\bm{g}^*_j\}, \{p(\boldsymbol{\Omega},\boldsymbol{\Omega}^*_i)\},\{p(\boldsymbol{\Omega}^*_i,\boldsymbol{\Omega}^*_j)\}, \{\omega_j\})$\;
+    $\boldsymbol{G}^{\text{NN}} = \texttt{GreenProjection}(\bm{g})$\;
+
+    \emph{步骤3：低维向量乘积得到解}\;
+    $I(\boldsymbol{r},\boldsymbol{\Omega}) = (\boldsymbol{G}^{\text{NN}})^\top \boldsymbol{W} \boldsymbol{q}$\;
+
+    \Return{$I(\boldsymbol{r},\boldsymbol{\Omega})$}\;
+\end{algorithm}
+
+\subsection{多GPU并行策略}
+
+EfficientRTE的多GPU并行策略与DeepRTE保持一致，核心采用数据并行策略，结合\texttt{pmap}与设备分片技术实现计算与数据的高效分布。
+
+实现中，首先通过\texttt{jax.device\_count()}获取可用GPU设备，将训练数据沿批次维度均分到各设备；其次，利用\texttt{jax.pmap}将训练步骤函数映射到多设备，自动实现数据的设备间分发与梯度的聚合，编码器与解码器的前向/反向传播通过\texttt{jax.vmap}在设备内进一步向量化；最后，通过JAX的设备分片注解优化大模型参数的存储与访问，减少设备间通信开销。整个并行流程无需手动编写分布式通信代码，在单机多卡场景下可实现接近线性的加速比。
+
+\section{扫掠法GPU并行优化}
+
+扫掠法（Sweeping Method）是求解辐射输运方程的经典数值方法，其核心思想是沿特征线方向（由角度离散点确定）依次更新空间网格点的角通量，通过迭代收敛得到稳态解。该方法因物理直观性强、精度可控，被广泛用于生成辐射输运问题的参考解。然而，传统扫掠法主要针对CPU架构设计，存在两大瓶颈：一是空间扫掠过程中网格点的更新依赖于上游邻居点，具有强串行性；二是角度离散与空间离散的高维组合导致计算量巨大，且难以与基于GPU的神经网络模型在相同硬件平台上进行效率对比。
+
+为解决上述问题，本文实现了一套多GPU并行优化的快速扫掠法，通过混合策略，结合高效的设备间通信，充分释放GPU的并行计算能力，实现辐射输运方程参考解的快速生成，为DeepRTE等神经网络模型提供公平的效率对比基准。
+
+\subsection{主要思想与设计原则}
+
+扫掠法的计算流程可拆解为三个核心步骤：（1）\textbf{散射矩计算}：利用所有角度的角通量积分得到散射源项；（2）\textbf{角度扫掠}：沿每个角度的特征线方向依次更新空间网格点；（3）\textbf{收敛检查}：判断迭代是否达到稳态。其中，“散射矩计算”需要全局角度信息，而“角度扫掠”在不同角度之间相对独立，这为并行化提供了切入点。
+
+本文的并行设计在全局上将角度离散点均匀分配到多个GPU设备，每个设备负责部分角度的角通量更新与散射矩计算，减少单设备内存压力并提升计算并行度；而在单个GPU内部，将空间网格点按“扫掠波前”组织，依赖关系已满足的网格点可同时由多个GPU线程计算，挖掘空间维度的并行潜力；同时，通过“全收集（All-Gather）”通信原语，在散射矩计算前同步所有设备的角通量，既保证全局信息共享，又最小化通信开销。
+
+\subsection{算法流程详解}
+
+以下结合伪代码（算法\ref{alg:fast-sweeping-gpu}），分阶段详细解释多GPU快速扫掠法的实现流程。
+
+\subsubsection{数据初始化与设备间划分}
+伪代码首先在$D$个GPU设备之间进行数据划分，核心是“角度域并行”的思想：
+\begin{itemize}
+    \item 将总角度数$n_v$按设备数$D$均分，每个设备负责$M = n_v / D$个角度的角通量$I^{d,[\ell]}_{i,j,k}$（上标$d$表示设备编号，$[\ell]$表示迭代步数）；
+    \item 散射核$p_{k,k'}$按角度维度切片，每个设备保留自身负责角度与所有角度的散射核$p^d_{k,k'}$（$k \in [(d-1)M, dM)$，$k'$覆盖全部角度）；
+    \item 宏观截面$\mu_t$、$\mu_s$因与角度无关，直接复制到所有设备，避免重复通信。
+\end{itemize}
+此步骤通过数据划分，将单设备的高维内存需求分散到多设备，为后续大规模离散问题的求解奠定基础。
+
+\subsubsection{迭代循环中的协同}
+迭代循环是扫掠法的核心，伪代码通过“全局通信-局部计算-局部扫掠-收敛检查”的流水线，实现多GPU高效协同：
+
+\paragraph{步骤1：跨设备全收集角通量}
+散射矩计算需要所有角度的角通量信息，因此首先通过$\texttt{All-Gather}$通信原语，将每个设备的局部角通量$I^{d,[\ell]}_{i,j,k}$汇总为全局角通量$I^{[\ell]}_{i,j,k'}$（$k'$覆盖全部角度）。$\texttt{All-Gather}$是GPU集群中高效的集合通信操作，可在对数时间内完成数据同步，避免点对点通信的高延迟。
+
+\paragraph{步骤2：各设备局部计算散射矩}
+拿到全局角通量后，每个设备独立计算自身负责角度的散射矩$S^{d,[\ell]}_{i,j,k}$。该步骤是“局部计算无通信”的典型场景：
+\begin{itemize}
+    \item 利用求积权重$w_{k'}$、散射核$p^d_{k,k'}$和全局角通量$I^{[\ell]}_{i,j,k'}$，通过数值积分得到散射源项；
+    \item 每个设备的$M$个角度、$n_x \times n_y$个空间网格点可完全并行，充分利用GPU的数千个计算核心。
+\end{itemize}
+
+\paragraph{步骤3：各设备执行角度扫掠}
+角度扫掠是扫掠法中串行性最强的部分，但通过“空间波前并行”可在GPU内部挖掘并行性：
+\begin{itemize}
+    \item 对每个角度，按特征线方向（如$x$正方向、$y$正方向等）确定扫掠顺序，确保更新当前网格点时，其依赖的上游邻居点（如$i-1,j$或$i,j-1$）已完成计算；
+    \item 在GPU内部，将空间网格点按“波前”组织（如对角线方向的网格点），同一波前内的网格点无依赖关系，可由多个GPU线程同时更新；
+    \item 扫掠更新公式通过有限差分离散，将角通量的更新转化为代数运算，适合GPU的单指令多线程（SIMT）执行模型：
+          \[
+              I^{d,[\ell+1]}_{i,j,k} = \frac{c_k\frac{I^{d,[\ell]}_{i-1,j,k}}{\Delta x} + s_k\frac{I^{d,[\ell]}_{i,j-1,k}}{\Delta y} + (\mu_s)_{i,j}\,S^{d,[\ell]}_{i,j,k}}{\frac{c_k}{\Delta x} + \frac{s_k}{\Delta y} + (\mu_t)_{i,j}}
+          \]
+\end{itemize}
+
+\paragraph{步骤4：收敛性检查}
+每轮迭代结束后，计算全局角通量的相对误差，若低于阈值$\text{tol}$则提前终止迭代。收敛检查需聚合所有设备的误差，可通过$\texttt{All-Reduce}$通信原语高效完成，避免主设备成为瓶颈。
+
+\subsubsection{结果收集}
+迭代收敛后，再次通过$\texttt{All-Gather}$将各设备的局部角通量汇总，得到完整的全局角通量$I^{[\ell]}$，作为辐射输运方程的数值解输出。
+
+除上述流程外，本文的GPU并行实现还包含以下优化细节：
+\begin {enumerate}
+\item \textbf {内存访问优化}：空间网格点按行 / 列优先连续存储，确保 GPU 全局内存访问合并；
+\item \textbf {多方向扫掠并行}：对不同特征线方向启动多 GPU 线程并行执行；
+\item \textbf {通信计算重叠}：当前角度扫掠时预启动下一轮 \texttt {All-Gather} 通信，隐藏延迟。
+\end {enumerate}
+
+通过上述多GPU并行优化，本文的快速扫掠法可以快速完成数据生成，既为DeepRTE模型等提供了高效的参考解生成工具，也实现了与神经网络模型在相同GPU硬件上的公平效率对比。
+
+\begin{algorithm}[!htp]
+    \caption{多 GPU 快速扫掠法（Multi-GPU Fast-Sweeping Method）}
+    \label{alg:fast-sweeping-gpu}
+    \SetAlgoLined
+    \KwIn{$\mu_t, \mu_s, \{c_k\}, \{s_k\}, \{w_{k'}\}, p, \Delta x, \Delta y, D, \text{tol}, \text{max\_iter}$}
+    \KwOut{$I$}
+
+    \BlankLine
+
+    \emph{在 $D$ 个设备之间划分角通量与散射核}
+    $M \gets n_v / D$\;
+
+    \For{$d = 1,\dots,D$}{
+    \emph{在第 $d$ 个设备上初始化角通量与散射核，并复制截面系数}
+    $I^{d,[\ell]}_{i,j,k} \gets 0,\quad I^{d,[\ell]}_{i,j,k} \in \mathbb{R}^{n_x \times n_y \times M}$\;
+    $p^d_{k,k'} \gets p_{k,k'},\quad k \in [(d-1)M, dM),\; k' \in [0,n_v)$\;
+    $\mu_t^d,\mu_s^d \gets \mu_t,\mu_s$\;
+    }
+
+    \BlankLine
+
+    \For{$\ell = 0,1,\dots,\text{max\_iter}-1$}{
+    \emph{步骤 1：跨设备收集角通量（全收集通信）}
+    $I^{[\ell]}_{i,j,k'} \gets \texttt{All-Gather}(\{I^{d,[\ell]}_{i,j,k}\}_{d=1}^D),\quad k' \in [0,n_v)$\;
+
+    \emph{步骤 2：在各设备上计算局部散射矩（本地计算，无通信）}
+    \For{$d = 1,\dots,D$}{
+    $S^{d,[\ell]}_{i,j,k} \gets \displaystyle\sum_{k'=0}^{n_v-1} w_{k'}\,p^d_{k,k'}\,I^{[\ell]}_{i,j,k'},\quad k \in [(d-1)M, dM)$\;
+    }
+
+    \emph{步骤 3：在各设备上执行角度扫掠（本地计算，无通信）}
+    \For{$d = 1,\dots,D$}{
+    \For{$(i,j)$ \text{ in sweep order}}{
+    $I^{d,[\ell+1]}_{i,j,k} \gets \dfrac{c_k\dfrac{I^{d,[\ell]}_{i-1,j,k}}{\Delta x} + s_k\dfrac{I^{d,[\ell]}_{i,j-1,k}}{\Delta y} + (\mu_s)_{i,j}\,S^{d,[\ell]}_{i,j,k}}{\dfrac{c_k}{\Delta x} + \dfrac{s_k}{\Delta y} + (\mu_t)_{i,j}},\quad k \in [(d-1)M, dM)$\;
+    }
+    }
+
+    \emph{步骤 4：检查收敛性}
+    \If{$\text{RelativeError}(I^{[\ell+1]}, I^{[\ell]}) < \text{tol}$}{
+        \textbf{break}\;
+    }
+    }
+
+    \BlankLine
+
+    \emph{在所有设备之间收集最终角通量}
+    $I^{[\ell]} \gets \texttt{All-Gather}(\{I^{d,[\ell]}\}_{d=1}^D)$\;
+
+    \Return{$I^{[\ell]}$}\;
+\end{algorithm}
+
+\section{传统神经方法实现}
+
+我们选择多输入算子（Multi-Input Operator, MIO）~\cite{jin2022mionet}作为基线模型与DeepRTE对比。MIO源自DeepONet，是可接受多个输入函数的通用算子学习框架，未针对RTE进行专门设计。选择MIO的原因在于：它能处理RTE解算子依赖的多输入函数（边界条件$I_-$、源项$q$、宏观截面$\mu_t$、$\mu_s$和散射核$p$）；理论上在足够数据和容量下可逼近任意连续算子~\cite{lu2021learning}，可清晰对比DeepRTE架构的优势。
+
+由于MIO是通用框架，需针对RTE的输入输出特性调整。
+针对RTE解算子的多输入特性，MIO通过4个独立的分支网络分别对总截面$\mu_t$、散射截面$\mu_s$、体源项$q$、边界入射条件$I_-$进行特征提取，将所有输入映射至维度为$P$的统一特征空间：
+\begin{align}
+    \boldsymbol{b}_1 & = \text{MLP}^{\text{branch}}_1(\mu_t), \quad \boldsymbol{b}_1 \in \mathbb{R}^P, \\
+    \boldsymbol{b}_2 & = \text{MLP}^{\text{branch}}_2(\mu_s), \quad \boldsymbol{b}_2 \in \mathbb{R}^P, \\
+    \boldsymbol{b}_3 & = \text{MLP}^{\text{branch}}_3(q), \quad \boldsymbol{b}_3 \in \mathbb{R}^P,     \\
+    \boldsymbol{b}_4 & = \text{MLP}^{\text{branch}}_4(I_-), \quad \boldsymbol{b}_4 \in \mathbb{R}^P,
+\end{align}
+其中$\boldsymbol{b}_1,\boldsymbol{b}_2,\boldsymbol{b}_3,\boldsymbol{b}_4$为各输入对应的分支特征向量，$P$为分支网络与主干网络的共享特征维度。
+
+同时，通过主干网络对待评估的相空间坐标$(\boldsymbol{r},\boldsymbol{\Omega})$进行编码，得到同维度的坐标特征：
+\begin{equation}
+    \boldsymbol{t}(\boldsymbol{r},\boldsymbol{\Omega}) = \text{MLP}^{\text{trunk}}(\boldsymbol{r},\boldsymbol{\Omega}), \quad \boldsymbol{t}(\boldsymbol{r},\boldsymbol{\Omega}) \in \mathbb{R}^P.
+\end{equation}
+
+最终通过哈达玛积融合多分支特征，再与主干坐标特征做内积，得到RTE解的算子近似：
+\begin{equation}
+    J(\boldsymbol{r},\boldsymbol{\Omega}) \approx \text{MIO}_{\mathcal{L}}(\mu_t,\mu_s;q,I_-) := \left( \boldsymbol{b}_1 \odot \boldsymbol{b}_2 \odot \boldsymbol{b}_3 \odot \boldsymbol{b}_4 \right) \cdot \boldsymbol{t}(\boldsymbol{r},\boldsymbol{\Omega}).
+\end{equation}

@@ -1,34 +1,61 @@
-\section{数值实验与结果}
-\label{sec:experiments}
+\section {通用数值实验设定}
+\label {sec:common-experiments}
 
-本节给出若干数值算例，用于系统评估 DeepRTE 在辐射传输方程求解中的精度与效率。实际应用中，RTE~\eqref{eq:rte} 定义在三维空间变量 $\br\in\mathbb{R}^3$ 与角变量 $\bOmega\in\sS^2$ 上，对应 $d=3$，因此是一个六维问题。借助适当的变量变换与对称性分析，可将其约化为低维模型，从而降低计算复杂度。
+本节介绍后续数值实验中通用的物理模型约化、计算域离散、相函数选择、截面参数设置以及基础训练配置。这些设定为 DeepRTE 与 EfficientRTE 的性能评估提供了统一的基准平台。
 
-在笛卡尔坐标系下，记
-\begin{equation}
-    \bOmega=(c,s,\zeta), \quad c =
-        {\left(1-\zeta^{2}\right)}^{\frac{1}{2}} \cos\theta, \quad s =
-        {\left(1-\zeta^{2}\right)}^{\frac{1}{2}} \sin\theta, \quad \text{for }|\zeta| \leq 1.
+\subsection{三维问题的二维约化}
+
+实际应用中，含源项的辐射传输方程（RTE）定义在三维空间变量 $\boldsymbol{r}\in\mathbb{R}^3$ 与角变量 $\boldsymbol{\Omega}\in\mathbb{S}^2$ 上，对应 $d=3$，是一个六维问题。借助适当的变量变换与对称性分析，可将其约化为低维模型，从而降低计算复杂度。
+
+在笛卡尔坐标系下，首先写出含体源项 $q(\boldsymbol{r},\boldsymbol{\Omega})$ 的三维稳态RTE完整形式：
+\begin{equation}\label{eq:rte-3d-source}
+    \begin{aligned}
+        (\boldsymbol{\Omega}\cdot\nabla + \mu_t(\boldsymbol{r})) I(\boldsymbol{r},\boldsymbol{\Omega})
+        = \frac{\mu_s(\boldsymbol{r})}{4\pi} \int_{\mathbb{S}^2} p(\boldsymbol{\Omega},\boldsymbol{\Omega}^*) I(\boldsymbol{r},\boldsymbol{\Omega}^*) \,\mathrm{d}\boldsymbol{\Omega}^*
+        + q(\boldsymbol{r},\boldsymbol{\Omega}),
+    \end{aligned}
 \end{equation}
-若总截面 $\mut$ 与散射截面 $\mus$ 仅依赖于平面坐标 $(x,y)$，且强度 $I$ 在 $z$ 方向上均匀，可定义
+其中 $q(\boldsymbol{r},\boldsymbol{\Omega})$ 为相空间内的体源项，其余符号含义与无源项情形一致。
+
+对三维角度向量 $\boldsymbol{\Omega}$ 做参数化，记
+\begin{equation}
+    \boldsymbol{\Omega}=(c,s,\zeta), \quad c =
+        {\left(1-\zeta^{2}\right)}^{\frac{1}{2}} \cos\theta, \quad s =
+        {\left(1-\zeta^{2}\right)}^{\frac{1}{2}} \sin\theta, \quad \text{for }|\zeta| \leq 1,
+\end{equation}
+其中 $\zeta\in[-1,1]$ 为极角余弦，$\theta\in[0,2\pi)$ 为方位角，此时角度微元满足 $\mathrm{d}\boldsymbol{\Omega} = \mathrm{d}\zeta \mathrm{d}\theta$。
+
+若总截面 $\mu_t$ 与散射截面 $\mu_s$ 仅依赖于平面坐标 $(x,y)$，强度 $I$ 在 $z$ 方向上均匀，且体源项 $q$ 同样在 $z$ 方向上均匀，我们可定义关于 $\zeta$ 的偶对称平均，将所有物理量约化为二维平面上的量。具体而言，定义约化辐射强度
 \begin{equation}
     \tilde{I}(x, y,\zeta,\theta) = \frac{1}{2}\bigl[I(x,y,z,c,s,\zeta) + I(x,y,z,c,s,-\zeta)\bigr],
 \end{equation}
-以及
+约化相函数
 \begin{equation}
     \tilde{p}(\zeta,\theta,\zeta^*, \theta^*) = \frac{1}{2}\bigl[p(c,s,\zeta, c^*,s^*,\zeta^*) + p(c,s,\zeta, c^*,s^*,-\zeta^*)\bigr],
 \end{equation}
-此时二者与 $z$ 无关，且关于 $\zeta$ 为偶函数，从而方程~\eqref{eq:rte-with-bc} 可约化为
+以及约化体源项
 \begin{equation}
+    \tilde{q}(x, y,\zeta,\theta) = \frac{1}{2}\bigl[q(x,y,z,c,s,\zeta) + q(x,y,z,c,s,-\zeta)\bigr].
+\end{equation}
+此时 $\tilde{I}$、$\tilde{p}$ 与 $\tilde{q}$ 均与 $z$ 无关，且关于 $\zeta$ 为偶函数。
+
+将上述约化量代入三维方程~\eqref{eq:rte-3d-source}，利用梯度算子的分解 $\nabla = (\partial_x, \partial_y, \partial_z)$ 以及 $\partial_z I = 0$、$\partial_z q = 0$ 的均匀性假设，对流项可简化为 $c\partial_x \tilde{I} + s\partial_y \tilde{I}$。对于散射项，三维积分 $\int_{\mathbb{S}^2} \cdot \mathrm{d}\boldsymbol{\Omega}^*$ 可分解为 $\int_0^{2\pi} \int_{-1}^1 \cdot \mathrm{d}\zeta^* \mathrm{d}\theta^*$，利用约化量关于 $\zeta$ 的偶对称性，可进一步将积分范围约化为 $[0,1]$ 并乘以因子2，即 $2\int_0^{2\pi} \int_0^1 \cdot \mathrm{d}\zeta^* \mathrm{d}\theta^*$，该因子与相函数原有的归一化因子 $1/(4\pi)$ 结合后得到 $1/(2\pi)$。
+
+经过上述推导，含源项的三维RTE最终可约化为如下二维平面问题：
+\begin{equation}\label{eq:rte-2d-reduced-source}
     \begin{aligned}
-         & c\partial_x \tilde{I}(x,y,\zeta,\theta)+s\partial_y \tilde{I}(x,y,\zeta,\theta)+\mut \,\tilde{I}(x,y,\zeta,\theta)                                              \\
-         & \quad= \frac{\mus}{2\pi}\int_{0}^{1}\int_0^{2\pi} \tilde{p}(\zeta, \theta, \zeta^*,\theta^*) \,\tilde{I}(x,y,\zeta^*,\theta^*) \,\diff{\theta^*}\diff{\zeta^*},
+         & c\partial_x \tilde{I}(x,y,\zeta,\theta)+s\partial_y \tilde{I}(x,y,\zeta,\theta)+\mu_t \,\tilde{I}(x,y,\zeta,\theta)                                                       \\
+         & \quad= \frac{\mu_s}{2\pi}\int_{0}^{1}\int_0^{2\pi} \tilde{p}(\zeta, \theta, \zeta^*,\theta^*) \,\tilde{I}(x,y,\zeta^*,\theta^*) \,\mathrm{d}{\theta^*}\mathrm{d}{\zeta^*}
+        + \tilde{q}(x,y,\zeta,\theta),
     \end{aligned}
 \end{equation}
-加上入射边界条件
+对应的入射边界条件为
 \begin{equation}
-    \tilde{I}(x,y,\bOmega)=\tilde{I}_{-}(x,y,\bOmega), \quad \text{当 }
-    \bOmega\cdot\bm{n}<0,\quad (x, y)\in\partial D.
+    \tilde{I}(x,y,\boldsymbol{\Omega})=\tilde{I}_{-}(x,y,\boldsymbol{\Omega}), \quad \text{当 }
+    \boldsymbol{\Omega}\cdot\bm{n}<0,\quad (x, y)\in\partial D.
 \end{equation}
+
+后续数值实验均基于该含源项的二维约化模型进行。为简化记号，下文中将省略约化量的上标，直接用 $I$、$p$、$q$ 表示二维约化后的物理量。
 
 相函数 $p$ 是辐射传输方程的核心组成，通常仅与入射、出射方向的夹角相关。本文选用归一化的 Henyey--Greenstein（H-G）相函数作为各向异性散射的代表模型：
 \begin{equation}
@@ -36,7 +63,7 @@
 \end{equation}
 其中参数 $g$ 控制前向与后向散射的相对权重：$g=0$ 对应各向同性散射，$g\to 1$ 则对应高度前向集中的散射。尽管数值实验基于 H-G 相函数，算法本身仍可直接适配其他散射模型。
 
-\subsection{数据集构造}\label{sec:dataset-construction}
+\subsection{数据集构造通用部分}\label{sec:dataset-construction}
 
 训练集与测试集均由传统数值方法生成，主要采用扫掠法（sweeping method）~\cite{koch1991solution,zeyao2004parallel}。
 相应的 MATLAB 与 Python 实现已开源于 \href{https://github.com/mazhengcn/rte-dataset}{rte-dataset} 仓库，便于复现实验与进行进一步比较。
@@ -64,7 +91,6 @@
     \bicaption{角度求积点及其权重。}{Angular quadrature points and weights of the quadrature set.}\label{tab:quadrature}
 \end{table}
 
-
 \paragraph{截面系数}
 总截面 $\mu_t(x,y)$ 与散射截面 $\mu_s(x,y)$ 在子区域 $D_\mu = [0.4, 0.6] \times [0.4, 0.6]$ 上随机取值，其余区域取常数，具体定义为
 \begin{equation} \label{eq:coefficients_definition}
@@ -81,6 +107,27 @@
         \end{cases}
     \end{aligned}
 \end{equation}
+
+\paragraph{数据归一化}
+在训练过程中，将辐射强度 $I$ 归一化到区间 $[0, 1]$：
+\begin{equation}
+    I_{\text{norm}} = \frac{I - I_{\text{min}}}{I_{\text{max}} - I_{\text{min}}},
+\end{equation}
+其中 $I_{\text{min}}$ 与 $I_{\text{max}}$ 分别为数据集中观测到的最小与最大强度值。该归一化有助于稳定训练过程并提升收敛性能。
+
+\paragraph{散射参数区间}
+模型在三种不同散射强度区间上进行训练与测试，这些区间由散射不对称参数 $g\in[0,1]$ 划分：$g=0$ 表示各向同性散射，$g=1$ 表示极端前向散射。具体区间为
+\begin{itemize}
+    \item \textbf{近各向同性（Near isotropy）}: $ g \sim \mathcal{U}(0, 0.2)$，对应几乎各向同性散射，即粒子在各方向散射概率接近相同；
+    \item \textbf{中度各向异性（Moderate anisotropy）}: $ g \sim \mathcal{U}(0.4, 0.6)$，对应中等强度的各向异性散射；
+    \item \textbf{强前向散射（Highly forward peaking）}: $ g \sim \mathcal{U}(0.7, 0.9)$，对应粒子主要沿前向传播的强各向异性情形，此时粒子轨迹高度相关、位置与散射方向紧密耦合，边界条件的微小变化也可能显著影响解的行为。
+\end{itemize}
+
+\section{DeepRTE数值实验}
+
+\subsection {DeepRTE 特有数据集与训练设置}
+
+本节介绍 DeepRTE 数值实验中针对无源项模型的特有数据集构造与训练设置。相较于通用设定，DeepRTE 的数据集构造采用了特定的边界条件设计，以全面评估模型在不同物理情形下的表现。
 
 \paragraph{训练集边界条件}
 训练数据集中采用 Delta 函数型入射边界条件，并用高斯函数进行近似。入射边界条件具体为
@@ -114,22 +161,7 @@
     \end{aligned}
 \end{equation}
 
-\paragraph{数据归一化}
-在训练过程中，将辐射强度 $I$ 归一化到区间 $[0, 1]$：
-\begin{equation}
-    I_{\text{norm}} = \frac{I - I_{\text{min}}}{I_{\text{max}} - I_{\text{min}}},
-\end{equation}
-其中 $I_{\text{min}}$ 与 $I_{\text{max}}$ 分别为数据集中观测到的最小与最大强度值。该归一化有助于稳定训练过程并提升收敛性能。
-
-\paragraph{散射参数区间}
-模型在三种不同散射强度区间上进行训练与测试，这些区间由散射不对称参数 $g\in[0,1]$ 划分：$g=0$ 表示各向同性散射，$g=1$ 表示极端前向散射。具体区间为
-\begin{itemize}
-    \item \textbf{近各向同性（Near isotropy）}: $ g \sim \mathcal{U}(0, 0.2)$，对应几乎各向同性散射，即粒子在各方向散射概率接近相同；
-    \item \textbf{中度各向异性（Moderate anisotropy）}: $ g \sim \mathcal{U}(0.4, 0.6)$，对应中等强度的各向异性散射；
-    \item \textbf{强前向散射（Highly forward peaking）}: $ g \sim \mathcal{U}(0.7, 0.9)$，对应粒子主要沿前向传播的强各向异性情形，此时粒子轨迹高度相关、位置与散射方向紧密耦合，边界条件的微小变化也可能显著影响解的行为。
-\end{itemize}
-
-上述数据集构造所用的超参数汇总于表~\ref{tab:dataset}。表中给出了计算区域、截面系数、离散参数、边界条件以及散射参数等设置。
+数据集构造所用的超参数汇总于表~\ref{tab:dataset}。表中给出了计算区域、截面系数、离散参数、边界条件以及散射参数等设置。
 \begin{table}[!htp]
     \centering
     \begin{tabular}{lp{0.3\textwidth}ll}
@@ -158,8 +190,6 @@
     \end{tabular}
     \bicaption{数据集构造中使用的超参数汇总。}{Summary of hyperparameters for dataset construction.}\label{tab:dataset}
 \end{table}
-
-\subsection{训练细节}
 
 \paragraph{训练配置}
 
@@ -208,8 +238,6 @@ DeepRTE 的网络超参数列于表~\ref{tab:parameters}。网络由衰减模块
     \bicaption{DeepRTE 网络超参数。}{DeepRTE network hyperparameters.}\label{tab:parameters}
 \end{table}
 
-
-\section{数值实验}
 \subsection{精度验证}
 \label{sec:acc}
 

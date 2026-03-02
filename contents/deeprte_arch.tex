@@ -1,148 +1,158 @@
-\section{RTE 及其解的结构简析}
-\label{sec:preliminaries}
+% \section{RTE 及其解的结构}
+% \label{sec:preliminaries}
 
-本节考察稳态辐射传输方程（RTE）解算子的基本性质，这些性质构成后续构建神经网络模型的理论基础。
+% 本节考察稳态辐射传输方程（RTE）解算子的基本性质，这些性质构成后续构建神经网络模型的理论基础。
 
-首先，定义边界集合
-\begin{equation}\label{eq:boundary}
-    \Gamma_{\pm} := \{(\br,\bOmega) \mid \br\in\partial
-    D,\;\bOmega\in\sS^{d-1},\;\mp\bn(\br)\cdot\bOmega<0 \},
+% 首先，定义边界集合
+% \begin{equation}\label{eq:boundary}
+%     \Gamma_{\pm} := \{(\br,\bOmega) \mid \br\in\partial
+%     D,\;\bOmega\in\sS^{d-1},\;\mp\bn(\br)\cdot\bOmega<0 \},
+% \end{equation}
+% 其中 $\bn(\br)$ 表示区域 $D$ 在边界点 $\br\in\partial D$ 处的外法向单位向量。辐射强度 $I(\br,\bOmega)$ 满足如下带有入射边界条件的 RTE：
+% \begin{equation}\label{eq:rte-with-bc}
+%     \begin{aligned}\bOmega \cdot \nabla I(\br,\bOmega) + \mut(\br) I(\br,\bOmega) & = \frac{\mus(\br)}{S_{d-1}} \int_{\sS^{d-1}} p(\bOmega,\bOmega^*) I(\br,\bOmega^*)\,\mathrm{d}{\bOmega^*}, &  & \text{在 } D\times\sS^{d-1}, \\
+%                I|_{\Gamma_{-}}(\br,\bOmega)                                   & = I_{-}(\br,\bOmega),                                                                                      &  & \text{在 }\Gamma_{-},
+%     \end{aligned}
+% \end{equation}
+% \todo[inline]{把in改成在等等，总之进行统一}
+% 其中 $I_{-}$ 为 $\Gamma_{-}$ 上给定的入射强度函数，$S_{d-1} = \dfrac{2\pi^{d/2}}{\Gamma(d/2)}$ 为单位球面 $\sS^{d-1}$ 的表面积。
+
+% 上述边值问题涉及的系数函数包括总截面 $\mu_t$、散射截面 $\mu_s$ 以及散射核 $p$。吸收截面定义为 $\mu_a = \mu_t - \mu_s$。散射核 $p(\bOmega,\bOmega^*)$ 描述了粒子从方向 $\bOmega^*$ 散射至方向 $\bOmega$ 的概率密度。我们假设散射核满足互易性（即 $p(\bOmega,\bOmega^*) = p(\bOmega^*,\bOmega)$）及归一化条件：
+% \begin{equation}
+%     \frac{1}{S_{d-1}}\int_{\sS^{d-1}} p(\bOmega,\bOmega^*) \,\mathrm{d}\bOmega^* = 1
+%     \quad\text{对几乎所有的 }\bOmega\in\sS^{d-1}.
+% \end{equation}
+% 在许多应用场景中，通常还假设散射核具有旋转不变性，即 $p$ 仅依赖于散射角 $\theta = \arccos(\bOmega\cdot\bOmega^*)$。尽管本文提出的算法同样适用于一般散射核，为简化叙述，后文将基于该假设展开。
+
+% \subsection{解的存在唯一性与解算子}
+
+% 本节回顾文献中关于解存在唯一性的相关结果。首先给出更一般情形下（即 $\mut$ 和 $\mus$ 同时依赖于 $\br$ 和 $\bm{v}$）在 $L^p$ 空间（$1\leq p\leq\infty$）中的存在唯一性定理。
+
+% \begin{theorem}[$L^p$ 空间中解的存在唯一性]\label{thm:existence-uniqueness-lp}
+%     假设：
+%     \begin{enumerate}
+%         \item 设 $\bm{v}=|\bm{v}|\bOmega\in V$，其中 $V\subset\mathbb{R}^3$ 为开集，$D\subset\mathbb{R}^d$ 为有界 Lipschitz 区域；
+%         \item $\mut:D\times V \to \mathbb{R}$ 非负，且 $\tau\mut\in L^\infty(D\times V)$。其中 $\tau(\br,\bm{v})$ 表示过点 $\br$ 沿方向 $\bm{v}$ 的射线在 $D$ 内的线段长度；
+%         \item $p: V\times V\to\mathbb{R}$ 非负且可测，并且
+%               \begin{equation}
+%                   \mua=\mut - \mus \geq 0.
+%               \end{equation}
+%     \end{enumerate}
+%     则对任意 $1\leq p \leq\infty$ 及允许的边界数据 $I_{-}$，辐射传输问题~\eqref{eq:rte-with-bc} 存在唯一解 $I$，并满足估计
+%     \begin{equation}
+%         \|\tau^{-\frac{1}{p}}I\|_{L^p(D\times V)} \leq e^{C_p}\|I_{-}\|_{L^p(\Gamma_{-};|\bn\cdot\bOmega|)}, \quad \text{其中 }
+%         C_p =\|\tau\mus\|_{L^\infty}.
+%     \end{equation}
+%     此外，若进一步假设 $\mut>0$，且存在某个 $\nu>0$ 使得
+%     \begin{equation}
+%         \frac{\mus}{\mut} \leq 1 - \nu,
+%     \end{equation}
+%     则有
+%     \begin{equation}
+%         \|\mut^{\frac{1}{p}}I\|_{L^p(D\times V)} \leq \nu^{-\frac{1}{p}}\|I_{-}\|_{L^p(\Gamma_{-};|\bn\cdot\bOmega|)},
+%     \end{equation}
+%     这一结果允许考虑 $\mut\to\infty$ 的极限情形，对渐近分析具有重要意义。
+% \end{theorem}
+
+% 针对本文的具体设定及数值计算目标，我们主要采用下述定理，此时假设 $\mut$ 和 $\mus$ 仅依赖于空间位置 $\br$。在 $L^2(D\times\sS^{d-1})$ 空间中，存在唯一性表述如下。
+
+% \begin{theorem}[$L^2$ 空间中解的存在唯一性]\label{thm:existence-uniqueness-l2}
+%     假设区域 $D$ 有界，且 $\mua=\mut-\mus$、$\mus$ 与 $p$ 均为非负、有界、可测函数，即
+%     \begin{equation}
+%         \mua=\mut -\mus \geq 0, \quad \mus \geq 0, \quad \text{且} \quad \|\mua\|_{L^\infty(D)}<\infty, \|\mus\|_{L^\infty(D)}<\infty.
+%     \end{equation}
+%     并假设
+%     \begin{equation}
+%         \frac{1}{S_{d-1}}\int_{\sS^{d-1}}p(\bOmega,\bOmega^*)\,\mathrm{d}\bOmega^*=1, \quad\text{对几乎所有的 } \bOmega\in \sS^{d-1}.
+%     \end{equation}
+%     则对任意 $I_{-}\in L^2(\partial D\times\sS^{d-1})$，带边界条件的 RTE~\eqref{eq:rte-with-bc} 在 $L^2(D\times\sS^{d-1})$ 中存在唯一解 $I$。此外，存在常数 $C>0$，仅依赖于 $\text{diam}(D)$，$\|\mua\|_{L^\infty(D)}$ 和 $\|\mus\|_{L^\infty(D)}$，使得
+%     \begin{equation}
+%         \|\bOmega\cdot\nabla I\|_{L^2(D\times\sS^{d-1})}+\|I\|_{L^2(D\times\sS^{d-1})} \leq C \|I_{-}\|_{L^2(\partial D\times\sS^{d-1})},
+%     \end{equation}
+% \end{theorem}
+
+% 在上述存在唯一性结果基础上，我们定义解算子
+% \begin{equation}
+%     \A: (I_{-};\mu_t,\mu_s,p) \mapsto I,
+% \end{equation}
+% 即算子 $\A$ 将边界入射强度 $I_{-}$、总截面 $\mut$、散射截面 $\mus$ 以及散射核 $p$ 映射为计算域内的解 $I$。需要注意的是，算子 $\A$ 关于 $I_{-}$ 是线性的，而关于其他系数函数则一般是非线性的。
+
+% 本文的目标是构造一种高效且精确的数值方法来近似解算子 $\mathcal{A}$。深入理解解算子的结构（即便仅是形式上的）对于设计高效且具有良好泛化能力的深度神经网络至关重要。为此，我们将 $\mathcal{A}$ 分解为若干计算上更易处理的子算子，从而为神经网络架构设计提供理论指导。
+
+% \subsection{解算子的结构分解}
+
+% 为得到更便于分析与计算的解算子表示，我们将 RTE 改写为一个不动点方程。
+
+% 定义 $\tau_{\br,\bOmega}(s_1,s_2)$ 为沿特征线从 $\br-s_1\bOmega$ 到 $\br-s_2\bOmega$ 的光学深度（optical depth）：
+% \begin{equation} \label{eq:optical-depth}
+%     \tau_{\br,\bOmega}(s_1,s_2):=\int_{s_1}^{s_2} \mut(\br-s \bOmega) \,\mathrm{d}{s},
+% \end{equation}
+% 并记 $s_{-}(\br,\bOmega)$ 为粒子沿方向 $\bOmega$ 从 $\br$ 逆向追溯至区域边界的距离：
+% \begin{equation}
+%     s_{-}(\br,\bOmega):= \inf \{s \geq 0 \mid \br-s\bOmega \in\partial D\}.
+% \end{equation}
+
+% 首先考虑无散射的纯衰减问题：
+% \begin{equation}\label{eq:rte-sweep}
+%     \begin{aligned}\bOmega \cdot \nabla J_b(\br,\bOmega) + \mut(\br) J_b(\br,\bOmega) & = 0,                  &  & \text{在 } D\times\sS^{d-1}, \\
+%                J_b|_{\Gamma_{-}}(\br, \bOmega)                                    & = I_{-}(\br,\bOmega), &  & \text{在 }\Gamma_{-},
+%     \end{aligned}
+% \end{equation}
+% 其解可表示为
+% \begin{equation}\label{eq:attenuation-op}
+%     J_b(\br, \bOmega)= \J I_{-}(\br, \bOmega) = e^{-\tau_{\br,\bOmega}(0,s_{-}(\br,\bOmega))} I_{-}\left(\br-s_{-}(\br, \bOmega)
+%     \bOmega, \bOmega\right).
+% \end{equation}
+% 其中 $\J$ 称为衰减算子（Attenuation Operator）。
+
+% 类似地，当源项 $I$ 已知时，方程
+% \begin{equation}\label{eq:lifting}
+%     (\bOmega\cdot\nabla + \mut)J = \mus I, \quad  J|_{\Gamma_{-}} = 0,
+% \end{equation}
+% 的解为
+% \begin{equation}\label{eq:lifting-op}
+%     J=\cL I(\br, \bOmega) = \int_0^{s_{-}(\br, \bOmega)} e^{-\tau_{\br,\bOmega}(0,s)}\mus(\br-s\bOmega)I(\br-s\bOmega, \bOmega)\,\mathrm{d}{s},
+% \end{equation}
+% 其中 $\cL$ 称为提升算子（Lifting Operator）。此外，定义散射算子
+% \begin{equation}\label{eq:scattering-op}
+%     \cS I(\br, \bOmega) = \frac{1}{S_{d-1}}\int_{\sS^{d-1}} p(\bOmega, \bOmega^*)I(\br, \bOmega^*) \,\mathrm{d}{\bOmega^*}.
+% \end{equation}
+
+% 通过对算子 $\bOmega \cdot \nabla + \mut(\br)$ 求逆，RTE 边值问题可改写为积分形式的算子方程
+% \begin{equation}\label{eq:rte-op-form}
+%     I = \cL\cS I + \J I_{-},
+% \end{equation}
+% 即一个第二类 Fredholm 积分方程，其中 $\cL\cS I$ 表示散射贡献，$\J I_{-}$ 表示边界条件贡献。
+
+% 该方程可通过不动点迭代求解：
+% \begin{equation}\label{eq:fixed-point-iteration}
+%     I^{m+1} = \cL\cS I^m + \J I_{-}.
+% \end{equation}
+% 当初始猜测取为 $I^0 = \J I_{-}$ 时，该迭代与经典的源迭代方法
+% ~\cite{adams2002fast}形式一致。进一步地，根据~\cite{egger2014lp} 的结论，我们有如下定理：
+% \begin{theorem}[谱半径估计]\label{thm:spectral-radius}
+%     在定理~\ref{thm:existence-uniqueness-lp} 的假设条件下，对任意 $1\leq p\leq \infty$，不动点算子 $\cL\cS$ 的谱半径满足
+%     \begin{equation}
+%         \rho_p(\cL\cS) := \lim_{n\to\infty}\sqrt[n]{\| (\cL\cS)^n \|_{L^p(D\times V;\tau^{-1})}} \leq 1 - e^{-C_p} < 1.
+%     \end{equation}
+%     这表明谱半径被一致地界定在 1 之下，从而保证迭代收敛到 RTE 的唯一解。
+% \end{theorem}因此，解算子可展开为级数形式：
+% \begin{equation}\label{eq:soln-op-series}
+%     \A[\mu_t,\mu_s,p] I_{-} = \sum_{n=0}^\infty(\cL\cS)^n\J I_{-}.
+% \end{equation}
+% 这一迭代结构为神经网络架构设计提供了重要启发，我们可以设计一个深度网络的框架自然地对应这一迭代过程。
+
+% 在传统文献中，散射截面 $\mus$ 往往被并入散射算子 $\mathcal{S}$，而不是包含在提升算子 $\mathcal{L}$ 中。
+% 但是在本文中，提升算子 $\mathcal{L}$ 负责刻画沿特征线的传输性质，$\mathcal{S}$ 主要处理角度耦合。因此为了适配本文所提出模型的特定结构，我们将 $\mus$ 放置于 $\mathcal{L}$ 中。这样的划分既便于在框架中有效整合 $\mus$，又保持了与网络结构设计之间的协调一致。
+
+\section{DeepRTE 网络架构设计}
+\label{sec:network-architecture}
+
+我们的目标是学习 RTE 定义在固定的有界区域 $D$ 上的解算子：
+\begin{equation}\label{eq:solution-op}
+    \ANN \approx \A: (I_{-}; \mut, \mus, p) \rightarrow I.
 \end{equation}
-其中 $\bn(\br)$ 表示区域 $D$ 在边界点 $\br\in\partial D$ 处的外法向单位向量。辐射强度 $I(\br,\bOmega)$ 满足如下带有入射边界条件的 RTE：
-\begin{equation}\label{eq:rte-with-bc}
-    \begin{aligned}\bOmega \cdot \nabla I(\br,\bOmega) + \mut(\br) I(\br,\bOmega) & = \frac{\mus(\br)}{S_{d-1}} \int_{\sS^{d-1}} p(\bOmega,\bOmega^*) I(\br,\bOmega^*)\,\mathrm{d}{\bOmega^*}, &  & \text{在 } D\times\sS^{d-1}, \\
-               I|_{\Gamma_{-}}(\br,\bOmega)                                   & = I_{-}(\br,\bOmega),                                                                                      &  & \text{在 }\Gamma_{-},
-    \end{aligned}
-\end{equation}
-其中 $I_{-}$ 为 $\Gamma_{-}$ 上给定的入射强度函数，$S_{d-1} = \dfrac{2\pi^{d/2}}{\Gamma(d/2)}$ 为单位球面 $\sS^{d-1}$ 的表面积。
-
-上述边值问题涉及的系数函数包括总截面 $\mu_t$、散射截面 $\mu_s$ 以及散射核 $p$。吸收截面定义为 $\mu_a = \mu_t - \mu_s$。散射核 $p(\bOmega,\bOmega^*)$ 描述了粒子从方向 $\bOmega^*$ 散射至方向 $\bOmega$ 的概率密度。我们假设散射核满足互易性（即 $p(\bOmega,\bOmega^*) = p(\bOmega^*,\bOmega)$）及归一化条件：
-\begin{equation}
-    \frac{1}{S_{d-1}}\int_{\sS^{d-1}} p(\bOmega,\bOmega^*) \,\mathrm{d}\bOmega^* = 1
-    \quad\text{对几乎所有的 }\bOmega\in\sS^{d-1}.
-\end{equation}
-在许多应用场景中，通常还假设散射核具有旋转不变性，即 $p$ 仅依赖于散射角 $\theta = \arccos(\bOmega\cdot\bOmega^*)$。尽管本文提出的算法同样适用于一般散射核，为简化叙述，后文将基于该假设展开。
-
-\subsection{解的存在唯一性与解算子}
-
-本节回顾文献中关于解存在唯一性的相关结果。首先给出更一般情形下（即 $\mut$ 和 $\mus$ 同时依赖于 $\br$ 和 $\bm{v}$）在 $L^p$ 空间（$1\leq p\leq\infty$）中的存在唯一性定理。
-
-\begin{theorem}[$L^p$ 空间中解的存在唯一性]\label{thm:existence-uniqueness-lp}
-    假设：
-    \begin{enumerate}
-        \item 设 $\bm{v}=|\bm{v}|\bOmega\in V$，其中 $V\subset\mathbb{R}^3$ 为开集，$D\subset\mathbb{R}^d$ 为有界 Lipschitz 区域；
-        \item $\mut:D\times V \to \mathbb{R}$ 非负，且 $\tau\mut\in L^\infty(D\times V)$。其中 $\tau(\br,\bm{v})$ 表示过点 $\br$ 沿方向 $\bm{v}$ 的射线在 $D$ 内的线段长度；
-        \item $p: V\times V\to\mathbb{R}$ 非负且可测，并且
-              \begin{equation}
-                  \mua=\mut - \mus \geq 0.
-              \end{equation}
-    \end{enumerate}
-    则对任意 $1\leq p \leq\infty$ 及允许的边界数据 $I_{-}$，辐射传输问题~\eqref{eq:rte-with-bc} 存在唯一解 $I$，并满足估计
-    \begin{equation}
-        \|\tau^{-\frac{1}{p}}I\|_{L^p(D\times V)} \leq e^{C_p}\|I_{-}\|_{L^p(\Gamma_{-};|\bn\cdot\bOmega|)}, \quad \text{其中 }
-        C_p =\|\tau\mus\|_{L^\infty}.
-    \end{equation}
-    此外，若进一步假设 $\mut>0$，且存在某个 $\nu>0$ 使得
-    \begin{equation}
-        \frac{\mus}{\mut} \leq 1 - \nu,
-    \end{equation}
-    则有
-    \begin{equation}
-        \|\mut^{\frac{1}{p}}I\|_{L^p(D\times V)} \leq \nu^{-\frac{1}{p}}\|I_{-}\|_{L^p(\Gamma_{-};|\bn\cdot\bOmega|)},
-    \end{equation}
-    这一结果允许考虑 $\mut\to\infty$ 的极限情形，对渐近分析具有重要意义。
-\end{theorem}
-
-针对本文的具体设定及数值计算目标，我们主要采用下述定理，此时假设 $\mut$ 和 $\mus$ 仅依赖于空间位置 $\br$。在 $L^2(D\times\sS^{d-1})$ 空间中，存在唯一性表述如下。
-
-\begin{theorem}[$L^2$ 空间中解的存在唯一性]\label{thm:existence-uniqueness-l2}
-    假设区域 $D$ 有界，且 $\mua=\mut-\mus$、$\mus$ 与 $p$ 均为非负、有界、可测函数，即
-    \begin{equation}
-        \mua=\mut -\mus \geq 0, \quad \mus \geq 0, \quad \text{且} \quad \|\mua\|_{L^\infty(D)}<\infty, \|\mus\|_{L^\infty(D)}<\infty.
-    \end{equation}
-    并假设
-    \begin{equation}
-        \frac{1}{S_{d-1}}\int_{\sS^{d-1}}p(\bOmega,\bOmega^*)\,\mathrm{d}\bOmega^*=1, \quad\text{对几乎所有的 } \bOmega\in \sS^{d-1}.
-    \end{equation}
-    则对任意 $I_{-}\in L^2(\partial D\times\sS^{d-1})$，带边界条件的 RTE~\eqref{eq:rte-with-bc} 在 $L^2(D\times\sS^{d-1})$ 中存在唯一解 $I$。此外，存在常数 $C>0$，仅依赖于 $\text{diam}(D)$，$\|\mua\|_{L^\infty(D)}$ 和 $\|\mus\|_{L^\infty(D)}$，使得
-    \begin{equation}
-        \|\bOmega\cdot\nabla I\|_{L^2(D\times\sS^{d-1})}+\|I\|_{L^2(D\times\sS^{d-1})} \leq C \|I_{-}\|_{L^2(\partial D\times\sS^{d-1})},
-    \end{equation}
-\end{theorem}
-
-在上述存在唯一性结果基础上，我们定义解算子
-\begin{equation}
-    \A: (I_{-};\mu_t,\mu_s,p) \mapsto I,
-\end{equation}
-即算子 $\A$ 将边界入射强度 $I_{-}$、总截面 $\mut$、散射截面 $\mus$ 以及散射核 $p$ 映射为计算域内的解 $I$。需要注意的是，算子 $\A$ 关于 $I_{-}$ 是线性的，而关于其他系数函数则一般是非线性的。
-
-本文的目标是构造一种高效且精确的数值方法来近似解算子 $\mathcal{A}$。深入理解解算子的结构（即便仅是形式上的）对于设计高效且具有良好泛化能力的深度神经网络至关重要。为此，我们将 $\mathcal{A}$ 分解为若干计算上更易处理的子算子，从而为神经网络架构设计提供理论指导。
-
-\subsection{解算子的结构分解}
-
-为得到更便于分析与计算的解算子表示，我们将 RTE 改写为一个不动点方程。
-
-定义 $\tau_{\br,\bOmega}(s_1,s_2)$ 为沿特征线从 $\br-s_1\bOmega$ 到 $\br-s_2\bOmega$ 的\emph{光学深度}：
-\begin{equation} \label{eq:optical-depth}
-    \tau_{\br,\bOmega}(s_1,s_2):=\int_{s_1}^{s_2} \mut(\br-s \bOmega) \,\mathrm{d}{s},
-\end{equation}
-并记 $s_{-}(\br,\bOmega)$ 为粒子沿方向 $\bOmega$ 从 $\br$ 逆向追溯至区域边界的距离：
-\begin{equation}
-    s_{-}(\br,\bOmega):= \inf \{s \geq 0 \mid \br-s\bOmega \in\partial D\}.
-\end{equation}
-
-首先考虑无散射的纯衰减问题：
-\begin{equation}\label{eq:rte-sweep}
-    \begin{aligned}\bOmega \cdot \nabla J_b(\br,\bOmega) + \mut(\br) J_b(\br,\bOmega) & = 0,                  &  & \text{在 } D\times\sS^{d-1}, \\
-               J_b|_{\Gamma_{-}}(\br, \bOmega)                                    & = I_{-}(\br,\bOmega), &  & \text{在 }\Gamma_{-},
-    \end{aligned}
-\end{equation}
-其解可表示为
-\begin{equation}\label{eq:attenuation-op}
-    J_b(\br, \bOmega)= \J I_{-}(\br, \bOmega) = e^{-\tau_{\br,\bOmega}(0,s_{-}(\br,\bOmega))} I_{-}\left(\br-s_{-}(\br, \bOmega)
-    \bOmega, \bOmega\right).
-\end{equation}
-其中 $\J$ 称为衰减算子。
-
-类似地，当源项 $I$ 已知时，方程
-\begin{equation}\label{eq:lifting}
-    (\bOmega\cdot\nabla + \mut)J = \mus I, \quad  J|_{\Gamma_{-}} = 0,
-\end{equation}
-的解为
-\begin{equation}\label{eq:lifting-op}
-    J=\cL I(\br, \bOmega) = \int_0^{s_{-}(\br, \bOmega)} e^{-\tau_{\br,\bOmega}(0,s)}\mus(\br-s\bOmega)I(\br-s\bOmega, \bOmega)\,\mathrm{d}{s},
-\end{equation}
-其中 $\cL$ 称为提升算子（Lifting Operator）。此外，定义散射算子
-\begin{equation}\label{eq:scattering-op}
-    \cS I(\br, \bOmega) = \frac{1}{S_{d-1}}\int_{\sS^{d-1}} p(\bOmega, \bOmega^*)I(\br, \bOmega^*) \,\mathrm{d}{\bOmega^*}.
-\end{equation}
-
-通过对算子 $\bOmega \cdot \nabla + \mut(\br)$ 求逆，RTE 边值问题可改写为积分形式的算子方程
-\begin{equation}\label{eq:rte-op-form}
-    I = \cL\cS I + \J I_{-},
-\end{equation}
-即一个第二类 Fredholm 积分方程，其中 $\cL\cS I$ 表示散射贡献，$\J I_{-}$ 表示边界条件贡献。
-
-该方程可通过不动点迭代求解：
-\begin{equation}\label{eq:fixed-point-iteration}
-    I^{m+1} = \cL\cS I^m + \J I_{-}.
-\end{equation}
-当初始猜测取为 $I^0 = \J I_{-}$ 时，该迭代与经典的源迭代方法
-~\cite{adams2002fast}形式一致。进一步地，根据~\cite{egger2014lp} 的结论，我们有如下定理：
-\begin{theorem}[谱半径估计]\label{thm:spectral-radius}
-    在定理~\ref{thm:existence-uniqueness-lp} 的假设条件下，对任意 $1\leq p\leq \infty$，不动点算子 $\cL\cS$ 的谱半径满足
-    \begin{equation}
-        \rho_p(\cL\cS) := \lim_{n\to\infty}\sqrt[n]{\| (\cL\cS)^n \|_{L^p(D\times V;\tau^{-1})}} \leq 1 - e^{-C_p} < 1.
-    \end{equation}
-    这表明谱半径被一致地界定在 1 之下，从而保证迭代收敛到 RTE 的唯一解。
-\end{theorem}因此，解算子可展开为级数形式：
-\begin{equation}\label{eq:soln-op-series}
-    \A[\mu_t,\mu_s,p] I_{-} = \sum_{n=0}^\infty(\cL\cS)^n\J I_{-}.
-\end{equation}
-这一迭代结构为神经网络架构设计提供了重要启发，我们可以设计一个深度网络的框架自然地对应这一迭代过程。
-
-在传统文献中，散射截面 $\mus$ 往往被并入散射算子 $\mathcal{S}$，而不是包含在提升算子 $\mathcal{L}$ 中。
-但是在本文中，提升算子 $\mathcal{L}$ 负责刻画沿特征线的传输性质，$\mathcal{S}$ 主要处理角度耦合。因此为了适配本文所提出模型的特定结构，我们将 $\mus$ 放置于 $\mathcal{L}$ 中。这样的划分既便于在框架中有效整合 $\mus$，又保持了与网络结构设计之间的协调一致。
+为简明起见，后续讨论中省略对 $D$ 的显式记号。
 
 \subsection{格林函数与解算子}
 
@@ -189,15 +199,7 @@
 
 若 $\mut$, $\mus$ 和 $p$ 给定且固定，一个朴素的想法是使用多层感知机（MLP）直接拟合格林函数 $G(\mathbf{r}, \Omega, \mathbf{r}', \Omega')$。然而，$\mu_t$ 和 $\mu_s$ 是空间依赖函数，甚至可能是不连续的，而 $p(\Omega, \Omega^\ast)$ 定义在 $\mathbb{S}^{d-1} \times \mathbb{S}^{d-1}$ 上。格林函数对这些参数函数的依赖关系可能极其复杂。在最后的实验章节里面，我们将展示这种朴素设计在泛化能力方面的劣势。因此，为了训练一个适用于复杂 $\mu_t$, $\mu_s$ 和 $p$ 的解算子，必须在神经算子的结构设计中充分考虑解对参数函数的特定依赖方式。
 
-\section{网络结构}
-\label{sec:network-architecture}
-
-我们的目标是学习 RTE 定义在固定的有界区域 $D$ 上的解算子：
-\begin{equation}\label{eq:solution-op}
-    \ANN \approx \A: (I_{-}; \mut, \mus, p) \rightarrow I.
-\end{equation}
-为简明起见，后续讨论中省略对 $D$ 的显式记号。
-
+\subsection{网络框架及输入输出设计}
 具体而言，解算子 $\ANN$ 由其分布核（即~\eqref{eq:rte-op} 中的格林函数）给出的积分表示
 \begin{equation}\label{eq:greens-integral-nn}
     I(\br, \bOmega)\approx I^\text{NN}(\br,\bOmega) = \ANN[\mut,\mus,p] I_{-} = \int_{\Gamma_-} G^{\text{NN}}(\br, \bOmega, \br', \bOmega') I_{-}(\br', \bOmega') \diff{\br'} \diff{\bOmega'},
@@ -250,7 +252,6 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
     \Return{$g$}\;
 \end{algorithm}
 
-
 \subsection{衰减模块}\label{sec:attenuation-module}
 
 衰减模块利用神经网络给出算子 $\J$ 和 $\cL$ 的格林函数离散表示。二者可统一写成
@@ -290,28 +291,28 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
         DeepRTE衰减模块架构。
     }{Attenuation module architecture.}\label{fig:attenuation-module}
 \end{figure}
-\begin{algorithm}[htp!]
-    \caption{衰减模块（Attenuation Module）}\label{alg:attenuation-module}
-    \SetAlgoLined
-    \KwIn{$\br,\bOmega,\br^{\prime},\bOmega^{\prime},\{\br_i^{\text{mesh}}\},\{{(\mut^{\text{mesh}})}_i\},\{{(\mus^{\text{mesh}})}_i\}, N_{\text{mlp}}=4,d_{\text{mlp}}=128,d_{\text{model}}=16$}
-    \KwOut{$\bm{g}$}
+% \begin{algorithm}[htp!]
+%     \caption{衰减模块（Attenuation Module）}\label{alg:attenuation-module}
+%     \SetAlgoLined
+%     \KwIn{$\br,\bOmega,\br^{\prime},\bOmega^{\prime},\{\br_i^{\text{mesh}}\},\{{(\mut^{\text{mesh}})}_i\},\{{(\mus^{\text{mesh}})}_i\}, N_{\text{mlp}}=4,d_{\text{mlp}}=128,d_{\text{model}}=16$}
+%     \KwOut{$\bm{g}$}
 
-    \BlankLine
+%     \BlankLine
 
-    \emph{利用光学深度网络计算特征}\;
-    $\tau_{-}^{\text{NN}} = \hyperref[alg:optical-depth-net]{\text{OpticalDepthNet}}(\br,\bOmega,\{\br_i^{\text{mesh}}\},\{{(\mut^{\text{mesh}})}_i\},\{{(\mus^{\text{mesh}})}_i\}, d_k=12, H=2)$\;
-    $\bm{z} = \text{concat}(\br, \bOmega, \br^{\prime}, \bOmega^{\prime}, e^{-\tau_{-}^{\text{NN}}})$\;
+%     \emph{利用光学深度网络计算特征}\;
+%     $\tau_{-}^{\text{NN}} = \hyperref[alg:optical-depth-net]{\text{OpticalDepthNet}}(\br,\bOmega,\{\br_i^{\text{mesh}}\},\{{(\mut^{\text{mesh}})}_i\},\{{(\mus^{\text{mesh}})}_i\}, d_k=12, H=2)$\;
+%     $\bm{z} = \text{concat}(\br, \bOmega, \br^{\prime}, \bOmega^{\prime}, e^{-\tau_{-}^{\text{NN}}})$\;
 
-    \emph{通过多层感知机处理特征, $\bm{z} \in \mathbb{R}^{d_{\text{mlp}}}$}\;
-    \For{$l\in[1,\ldots,N_{\text{mlp}-1}]$}{
-        $\bm{z}\gets\text{tanh}(\text{Linear}(\bm{z}))$\;
-    }
+%     \emph{通过多层感知机处理特征, $\bm{z} \in \mathbb{R}^{d_{\text{mlp}}}$}\;
+%     \For{$l\in[1,\ldots,N_{\text{mlp}-1}]$}{
+%     $\bm{z}\gets\text{tanh}(\text{Linear}(\bm{z}))$\;
+%     }
 
-    \emph{将特征投影到输出空间, $\bm{g} \in \mathbb{R}^{d_{\text{model}}}$}\;
-    $\bm{g} = \text{Linear}(\bm{z})$\;
+%     \emph{将特征投影到输出空间, $\bm{g} \in \mathbb{R}^{d_{\text{model}}}$}\;
+%     $\bm{g} = \text{Linear}(\bm{z})$\;
 
-    \Return{$\bm{g}$}\;
-\end{algorithm}
+%     \Return{$\bm{g}$}\;
+% \end{algorithm}
 
 \subsubsection{光学深度网络}
 光学深度网络用于刻画沿特征线的累积影响。传统的沿特征线数值积分方法往往面临较大计算代价。例如，由 \eqref{eq:optical-depth} 可知，若要在每个相空间点上计算下述光学深度
@@ -411,24 +412,24 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
 \begin{equation}
     c(\br-s_j\bOmega, \br^{\text{mesh}}_i) = c\left(s_j; {(r^\text{mesh}_\text{local})}_i, {(\theta^\text{mesh}_\text{local})}_i\right).
 \end{equation}
-\begin{algorithm}[htp!]
-    \caption{相对位置编码（Relative Position Encoding）}\label{alg:relative-position-encoding}
-    \SetAlgoLined
-    \KwIn{$\br, \bOmega, \tilde{\br}$}
-    \KwOut{$(r_\text{local},\theta_\text{local}), m$}
+% \begin{algorithm}[htp!]
+%     \caption{相对位置编码（Relative Position Encoding）}\label{alg:relative-position-encoding}
+%     \SetAlgoLined
+%     \KwIn{$\br, \bOmega, \tilde{\br}$}
+%     \KwOut{$(r_\text{local},\theta_\text{local}), m$}
 
-    \emph{计算相对位置向量}\;
-    $\br_{\text{rel}} = \br - \tilde{\br}$\;
+%     \emph{计算相对位置向量}\;
+%     $\br_{\text{rel}} = \br - \tilde{\br}$\;
 
-    \emph{计算局部坐标系下的分量}\;
-    $r_{\text{local}} =  \br_{\text{rel}} \cdot \bOmega$\;
-    $\theta_{\text{local}} = r_{\text{local}}/\|\br_{\text{local}}\|$\;
+%     \emph{计算局部坐标系下的分量}\;
+%     $r_{\text{local}} =  \br_{\text{rel}} \cdot \bOmega$\;
+%     $\theta_{\text{local}} = r_{\text{local}}/\|\br_{\text{local}}\|$\;
 
-    \emph{生成沿特征线的掩码}\;
-    $m = -10^{10} \text{ if } s_\text{local} < 0 \text{ else } 0$\;
+%     \emph{生成沿特征线的掩码}\;
+%     $m = -10^{10} \text{ if } s_\text{local} < 0 \text{ else } 0$\;
 
-    \Return{$(r_\text{local},\theta_\text{local}), m$}\;
-\end{algorithm}
+%     \Return{$(r_\text{local},\theta_\text{local}), m$}\;
+% \end{algorithm}
 基于上述观察，可以将光学深度近似为
 \begin{equation}
     \begin{aligned}
@@ -457,30 +458,29 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
 
 综合上述要素，可得到算法~\ref{alg:optical-depth-net} 所示的 OpticalDepthNet 计算流程：
 
-\begin{algorithm}[htp!]
-    \caption{光学深度网络（Optical Depth Network）}\label{alg:optical-depth-net}
-    \SetAlgoLined
-    \KwIn{$\br, \bOmega, \{\br_i^{\text{mesh}}\}, \{{(\mut^{\text{mesh}})}_i\}, \{{(\mus^{\text{mesh}})}_i\}, d_k=12, H=2$}
-    \KwOut{$\tau_{-}$}
+% \begin{algorithm}[htp!]
+%     \caption{光学深度网络（Optical Depth Network）}\label{alg:optical-depth-net}
+%     \SetAlgoLined
+%     \KwIn{$\br, \bOmega, \{\br_i^{\text{mesh}}\}, \{{(\mut^{\text{mesh}})}_i\}, \{{(\mus^{\text{mesh}})}_i\}, d_k=12, H=2$}
+%     \KwOut{$\tau_{-}$}
 
-    \emph{计算网格点的相对位置编码}\;
-    ${(\br^\text{mesh}_{\text{local}})}_i, m_i = \hyperref[alg:relative-position-encoding]{\text{RelativePositionEncoding}}(\br, \bOmega, \br_i^{\text{mesh}})$\;
+%     \emph{计算网格点的相对位置编码}\;
+%     ${(\br^\text{mesh}_{\text{local}})}_i, m_i = \hyperref[alg:relative-position-encoding]{\text{RelativePositionEncoding}}(\br, \bOmega, \br_i^{\text{mesh}})$\;
 
-    \emph{将输入投影到多头注意力空间, $\bm{q}^h, \bm{k}_i^h \in \mathbb{R}^{d_k}, \bm{v}_i^h \in \mathbb{R}^{d_v}$}\;
-    $\bm{q}^h = \text{LinearNoBias}((\br,\bOmega))$\;
-    $\bm{k}_i^h = \text{LinearNoBias}\left({(\br^\text{mesh}_{\text{local}})}_i\right)$\;
-    $\bm{v}_i^h = \text{LinearNoBias}\left(\text{concat}\left({(\mut^{\text{mesh}})}_i,{(\mus^{\text{mesh}})}_i\right)\right)$\;
+%     \emph{将输入投影到多头注意力空间, $\bm{q}^h, \bm{k}_i^h \in \mathbb{R}^{d_k}, \bm{v}_i^h \in \mathbb{R}^{d_v}$}\;
+%     $\bm{q}^h = \text{LinearNoBias}((\br,\bOmega))$\;
+%     $\bm{k}_i^h = \text{LinearNoBias}\left({(\br^\text{mesh}_{\text{local}})}_i\right)$\;
+%     $\bm{v}_i^h = \text{LinearNoBias}\left(\text{concat}\left({(\mut^{\text{mesh}})}_i,{(\mus^{\text{mesh}})}_i\right)\right)$\;
 
-    \emph{计算注意力权重并聚合值, $\bm{\tau}^h\in\R^{d_v}$}\;
-    $a_{i}^h = \text{softmax}_i\left(\frac{1}{\sqrt{d_k}}{(\bm{q}^h)}^{\transpose}\bm{k}_i^h+m_i\right)$\;
-    $\bm{\tau}^h = \sum_i a_{i}^h \bm{v}_i^h$\;
+%     \emph{计算注意力权重并聚合值, $\bm{\tau}^h\in\R^{d_v}$}\;
+%     $a_{i}^h = \text{softmax}_i\left(\frac{1}{\sqrt{d_k}}{(\bm{q}^h)}^{\transpose}\bm{k}_i^h+m_i\right)$\;
+%     $\bm{\tau}^h = \sum_i a_{i}^h \bm{v}_i^h$\;
 
-    \emph{拼接多头输出并投影, $\tau_{-}\in \mathbb{R}^{d_\tau}$}\;
-    $\tau_{-} = \text{LinearNoBias}\left(\text{concat}_h(\bm{\tau}^h)\right)$\;
+%     \emph{拼接多头输出并投影, $\tau_{-}\in \mathbb{R}^{d_\tau}$}\;
+%     $\tau_{-} = \text{LinearNoBias}\left(\text{concat}_h(\bm{\tau}^h)\right)$\;
 
-    \Return{$\tau_{-}$}\;
-\end{algorithm}
-
+%     \Return{$\tau_{-}$}\;
+% \end{algorithm}
 
 \subsection{散射模块}\label{sec:scattering-module}
 散射模块用于刻画多次散射效应，其设计基于~\eqref{eq:greens-function-series} 中算子 $G$ 的级数展开。对应的网络结构如图~\ref{fig:scattering-module} 所示，可写作
@@ -514,7 +514,6 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
     \bicaption{散射模块。}{Scattering module.}\label{fig:scattering-module}
 \end{figure}
 
-
 图~\ref{fig:scattering-module}展示了散射模块的基本思路，即堆叠残差块，结合物理先验的 $\cS$ 近似层，并采用 tanh 激活的算子变换与自适应层归一化以稳定训练。
 
 \begin{figure}[htp!]
@@ -527,25 +526,25 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
 
 \noindent 散射模块的详细算法在算法~\ref{alg:scattering-module}中提供。
 
-\begin{algorithm}[htp!]
-    \caption{散射模块（Scattering Module）}\label{alg:scattering-module}
-    \SetAlgoLined
-    \KwIn{$\bm{g}, \{\bm{g}^*_j\}, \{p(\bOmega,\bOmega^*_i)\},\{p(\bOmega^*_i,\bOmega^*_j)\}, \{w_j\}, N_s=2$}
-    \KwOut{$\bm{g}$}
+% \begin{algorithm}[htp!]
+%     \caption{散射模块（Scattering Module）}\label{alg:scattering-module}
+%     \SetAlgoLined
+%     \KwIn{$\bm{g}, \{\bm{g}^*_j\}, \{p(\bOmega,\bOmega^*_i)\},\{p(\bOmega^*_i,\bOmega^*_j)\}, \{w_j\}, N_s=2$}
+%     \KwOut{$\bm{g}$}
 
-    \emph{保存初始状态用于残差连接, ${(\bm{g}^*_j)}^{\text{init}}\in \mathbb{R}^{d_{\text{model}}}$}\;
-    ${(\bm{g}^*_j)}^{\text{init}} = \bm{g}^*_j$\;
+%     \emph{保存初始状态用于残差连接, ${(\bm{g}^*_j)}^{\text{init}}\in \mathbb{R}^{d_{\text{model}}}$}\;
+%     ${(\bm{g}^*_j)}^{\text{init}} = \bm{g}^*_j$\;
 
-    \emph{执行带有跳跃连接的散射块迭代}\;
-    \For{$\ell\in[0,\ldots,N_\ell-2]$}{
-    \emph{添加初始值以模拟级数展开, $\bm{g}^*_i\in \mathbb{R}^{d_{\text{model}}}$}\;
-    $\bm{g}^*_i\gets{(\bm{g}^*_i)}^{\text{init}} + \hyperref[alg:scattering-block]{\text{ScatteringBlock}_\ell}(\{\bm{g}^*_j\},\{p(\bOmega^*_i,\bOmega^*_j), \{w_j\} \}) $\;
-        }
+%     \emph{执行带有跳跃连接的散射块迭代}\;
+%     \For{$\ell\in[0,\ldots,N_\ell-2]$}{
+%     \emph{添加初始值以模拟级数展开, $\bm{g}^*_i\in \mathbb{R}^{d_{\text{model}}}$}\;
+%     $\bm{g}^*_i\gets{(\bm{g}^*_i)}^{\text{init}} + \hyperref[alg:scattering-block]{\text{ScatteringBlock}_\ell}(\{\bm{g}^*_j\},\{p(\bOmega^*_i,\bOmega^*_j), \{w_j\} \}) $\;
+%         }
 
-    $\bm{g}\mathrel{+}=\hyperref[alg:scattering-block]{\text{ScatteringBlock}_{N_\ell-1}}(\{\bm{g}^*_i\},\{p(\bOmega,\bOmega^*_i)\}, \{\omega_i\})$ \hfill \emph{$\bm{g}\in \mathbb{R}^{d_{\text{model}}}$} \;
+%     $\bm{g}\mathrel{+}=\hyperref[alg:scattering-block]{\text{ScatteringBlock}_{N_\ell-1}}(\{\bm{g}^*_i\},\{p(\bOmega,\bOmega^*_i)\}, \{\omega_i\})$ \hfill \emph{$\bm{g}\in \mathbb{R}^{d_{\text{model}}}$} \;
 
-    \Return{$\bm{g}$}\;
-\end{algorithm}
+%     \Return{$\bm{g}$}\;
+% \end{algorithm}
 
 \subsubsection{散射块}
 基于~\eqref{eq:soln-op-series} 的级数展开，我们定义沿特征线的截断状态向量，用以刻画离散采样点处的辐射场：
@@ -624,24 +623,23 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
 
 散射块的详细计算步骤在算法~\ref{alg:scattering-block} 中给出。
 
-\begin{algorithm}[htp!]
-    \caption{散射块（Scattering Block）}\label{alg:scattering-block}
-    \SetAlgoLined
-    \KwIn{$\{\bm{g}_i\}, \{p_i\}, \{\omega_i\}, d_{\text{model}}=16$}
-    \KwOut{$\bm{g}$}
+% \begin{algorithm}[htp!]
+%     \caption{散射块（Scattering Block）}\label{alg:scattering-block}
+%     \SetAlgoLined
+%     \KwIn{$\{\bm{g}_i\}, \{p_i\}, \{\omega_i\}, d_{\text{model}}=16$}
+%     \KwOut{$\bm{g}$}
 
-    \emph{通过加权求和近似数值积分}\;
-    $\bm{g}  = \sum_i \omega_i p_i \bm{g}_i$\;
+%     \emph{通过加权求和近似数值积分}\;
+%     $\bm{g}  = \sum_i \omega_i p_i \bm{g}_i$\;
 
-    \emph{应用线性变换和激活函数, $\bm{g}\in \mathbb{R}^{d_{\text{model}}}$}\;
-    $\bm{g}\gets \text{tanh}\left(\text{Linear}( \bm{g})\right)$\;
+%     \emph{应用线性变换和激活函数, $\bm{g}\in \mathbb{R}^{d_{\text{model}}}$}\;
+%     $\bm{g}\gets \text{tanh}\left(\text{Linear}( \bm{g})\right)$\;
 
-    \emph{应用层归一化}\;
-    $\bm{g} \gets \text{LayerNorm}(\bm{g})$\;
+%     \emph{应用层归一化}\;
+%     $\bm{g} \gets \text{LayerNorm}(\bm{g})$\;
 
-    \Return{$\bm{g}$}\;
-\end{algorithm}
-
+%     \Return{$\bm{g}$}\;
+% \end{algorithm}
 
 为了将 $\mus e^{-\tau(0,s'_j)}$ 编码到散射模块中，我们在方程~\eqref{eq:scattering-block}中构造权重 $\bm{W}^\ell$ 如下：
 \begin{equation}
@@ -658,7 +656,17 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
         \tilde{w}_j^{\br-s'_{d_\mathrm{model}} \bOmega, \bOmega} \circ \tau^{NN}_{-,s}
     \end{pmatrix},
 \end{equation}
-其中 $\tau^{NN}_{-,s} \approx ( \mus(\br-s'_1\bOmega) e^{-\tau(0,s'_1)}, \mus(\br-s'_2\bOmega) e^{-\tau(0,s'_2)}, \cdots, \mus(\br-s'_{d_{\mathrm{model}}}\bOmega) e^{-\tau(0,s'_{d_{\mathrm{model}}})} )$。我们观察到 $\tau(0,s'_j)$ 可以使用类似于我们衰减模块的基于注意力的架构来建模。完整的计算序列——评估 $\tau(0,s'_j)$、应用指数以及乘以 $\mus$——由神经网络端到端地近似。
+其中
+\begin{equation}
+    \tau^{NN}_{-,s} \approx
+    \begin{pmatrix}
+        \mus(\br-s'_1\bOmega) e^{-\tau(0,s'_1)} \\
+        \mus(\br-s'_2\bOmega) e^{-\tau(0,s'_2)} \\
+        \vdots                                  \\
+        \mus(\br-s'_{d_{\mathrm{model}}}\bOmega) e^{-\tau(0,s'_{d_{\mathrm{model}}})}
+    \end{pmatrix}\transpose.
+\end{equation}
+我们观察到 $\tau(0,s'_j)$ 可以使用类似于我们衰减模块的基于注意力的架构来建模。完整的计算序列——评估 $\tau(0,s'_j)$、应用指数以及乘以 $\mus$——由神经网络端到端地近似。
 
 在具体实现中，该网络与 $\tau^{NN}_{-,t}$ 一并集成在衰减模块中，$\mathrm{OpticalDepthNet}$ 的输出为拼接后的向量 $\tau_- = \mathrm{Concat}(\tau^{NN}_{-,t}, \tau^{NN}_{-,s})$。这一设计在算法~\ref{alg:optical-depth-net} 中被形式化，其中
 \begin{equation}
@@ -666,28 +674,17 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
 \end{equation}
 其中 $d_\tau > d_{\mathrm{model}}$。
 
-\subsection{模块优势与特点}
-
-衰减模块的设计赋予了 DeepRTE 显著的灵活性和计算优势，主要体现在以下几个方面：
-
-\begin{itemize}
-    \item \textbf{网格选取的自由性}：这是本模块最核心的优势。输入网格点 $\{\br^{\text{mesh}}_i\}$ 仅用于刻画介质参数 $\mu_t$ 和 $\mu_s$ 的空间分布，而与辐射场 $I$ 的求解位置完全解耦。这意味着：
-          \begin{enumerate}
-              \item 网格点不必与求解点重合，也不受求解区域几何形状的限制。
-              \item 对于 $\mu_t$ 变化平缓或分段常数的区域，可以使用非常稀疏的网格来精确表示介质属性，从而大幅降低计算量。
-              \item 支持非结构化网格，能够灵活适应复杂的介质分布。
-          \end{enumerate}
-
-    \item \textbf{计算效率与精度的平衡}：在实际应用中，虽然默认使用全场网格点参与计算以保证通用性，但该架构天然支持局部化策略。在大规模三维问题中，可以仅选取特征线邻域内的网格点子集参与注意力计算（如带状区域等），从而在保持精度的同时显著提升推理速度。
-\end{itemize}
-
-在散射模块中，\eqref{eq:scattering-mus}引入了可学习的权重 $\bm{w}^\cL_{ij} = \tilde{w}_j^{\br-s'_i \bOmega, \bOmega} \mus e^{-\tau(0,s'_j)}$，这会带来一个疑问，即训练结束的权重是一个固定的值，但是$\bm{w}^\cL_{ij}$中出现的 $\mus$ 和 $\tau$ 实际上是输入相关的变量，虽然我们将$\mut$，$\mus$拼接在一起作为OpticalDepthNet的输入并传入散射模块以补足$\mus$的信息，但是这种与物理形式有差异的设计否会导致表达能力受限？
-
+在本小节的最后需要特殊说明的是，\eqref{eq:scattering-mus} 引入了可学习的权重
+\begin{equation}
+    \bm{w}^\cL_{ij} = \tilde{w}_j^{\br-s'_i \bOmega, \bOmega} \,\mus\, e^{-\tau(0,s'_j)}.
+\end{equation}
+这会带来一个疑问：训练结束后学到的权重是一个固定值，但 $\bm{w}^\cL_{ij}$ 中出现的 $\mus$ 和 $\tau$ 实际上是输入相关的变量。
+虽然我们将 $\mut$、$\mus$ 拼接在一起作为 OpticalDepthNet 的输入并传入散射模块，以补足 $\mus$ 的信息，但这种与物理形式有差异的设计是否会导致表达能力受限？
 为此，我们对比了两套网络设计。
 首先，我们把符合物理意义的 $\bm{w}^\cL_{ij}$ 进行了实验的复现。具体来说，我们使用与衰减模块中相同的 OpticalDepthNet 来预测 $\tau(0,s'_j)$，并将 $\mus$ 从输入中直接提取出来计算 $\bm{w}^\cL_{ij}$。然后，将原衰减模块的输出$\bm{G}^{\text{NN}}$ 与 $\bm{w}^\cL_{ij}$ 拼接，形成散射模块的输入，即:
 \begin{equation}
     \begin{aligned}
-        \bm{G}^{0}         & = \mathrm{Concat}\left(\bm{G}^{\text{NN}}, \mathbf{W}^\ell\right),             \\
+        \bm{G}^{0}         & = \mathrm{Concat}\left(\bm{G}^{\text{NN}}, \mathbf{W}^\ell\right),          \\
         \bm{G}^{\text{NN}} & =
         \begin{pmatrix}
             G^{\text{NN}}(\br-s_1 \bOmega, \bOmega; \br', \bOmega') \\
@@ -702,10 +699,10 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
         \end{pmatrix},
     \end{aligned}
 \end{equation}
-其中 $\bm{w}^\cL_{ij} = \tilde{w}_j^{\br-s'_i \bOmega, \bOmega} \mus(\br-s'_j\bOmega) e^{-\tau^{NN}_{-,s}(0,s'_j)}$。
-
+其中
+\begin{equation}
+    \bm{w}^\cL_{ij} = \tilde{w}_j^{\br-s'_i \bOmega, \bOmega} \,\mus(\br-s'_j\bOmega)\, e^{-\tau^{NN}_{-,s}(0,s'_j)}.
+\end{equation}
 最后将上述的 $\bm{G}^0$ 输入到~\eqref{scattering_layer}中进行散射模块的实现，最后的迭代网络结构与之前保持一致。上述实现更改了散射模块的输入形式，但并未改变散射块的结构，使得网络满足了物理意义上的 $\bm{w}^\cL_{ij}$ 形式。
-
 第二种实现则是我们在前文中介绍的直接学习 $\bm{W}^\ell$ 的方式。将$\mut$，$\mus$拼接在一起作为OpticalDepthNet的输入，详情见算法~\ref{alg:optical-depth-net}。
-
 实验结果表明，这两种方式的表现相差无几。这说明，我们将$\mut$，$\mus$作为衰减输入的设计是合理且有效的。

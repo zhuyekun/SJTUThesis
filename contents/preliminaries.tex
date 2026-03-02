@@ -8,11 +8,13 @@
 
 辐射输运方程（radiative transport equation, RTE）广泛应用于中子输运、大气辐射传输及光学成像等领域，描述了粒子在介质中输运并发生吸收、发射和散射的物理过程。
 
-设 $D \subset \mathbb{R}^d$ 为空间区域，$\sS^{d-1}$ 为速度方向的单位球面。考虑如下带有入射边界条件的稳态辐射输运方程：
+设 $D \subset \mathbb{R}^d$ 为空间区域，$\sS^{d-1}$ 为速度方向的单位球面。考虑如下带有入射边界条件的辐射输运方程：
 \begin{equation}\label{eq:rte}
     \begin{aligned}
-        \bOmega \cdot \nabla I(\br, \bOmega) + \mut(\br) I(\br, \bOmega) & = \frac{\mus(\br)}{S_{d-1}}\int_{\sS^{d-1}} p(\bOmega, \bOmega^*) I(\br, \bOmega^*) \diff{\bOmega^*}, &  & \text{in } D \times \sS^{d-1}, \\
-        I(\br, \bOmega)                                                  & = I_{-}(\br, \bOmega),                                                                                &  & \text{on } \Gamma_{-}.
+        (\bOmega\cdot\nabla + \mu_t(\br)) I(\br,\bOmega)
+        - \frac{\mu_s(\br)}{S_{d-1}} \int_{\mathbb{S}^{d-1}} p(\bOmega,\bOmega^*) I(\br,\bOmega^*)\,\diff\bOmega^*
+                        & = q(\br,\bOmega),      &  & \text{in } D \times \sS^{d-1}, \\
+        I(\br, \bOmega) & = I_{-}(\br, \bOmega), &  & \text{on } \Gamma_{-}.
     \end{aligned}
 \end{equation}
 其中 $I(\br, \bOmega)$ 表示辐射强度，依赖于空间位置 $\br$ 和角度 $\bOmega$。$S_{d-1} = \frac{2\pi^{d/2}}{\Gamma(d/2)}$ 为单位球面表面积。边界集合定义为 $\Gamma_{\pm} := \{(\br,\bOmega) \in \partial D \times \sS^{d-1} \mid \mp\bn(\br)\cdot\bOmega<0 \}$，其中 $\bn(\br)$ 为边界外法线方向，$\Gamma_{-}$ 即为入射边界，$I_{-}$ 为给定的入射函数。
@@ -22,40 +24,6 @@
 由于 RTE 是定义在高维相空间上的微分-积分方程（例如 $d=3$ 时为 5 维），数值求解计算代价高昂，是高性能计算领域的重要挑战之一。
 
 为了数值求解辐射输运方程，通常需要对角度变量和空间变量进行离散。
-
-% \subsection{辐射输运方程的低维近似}
-
-% 在实际应用中，RTE~\eqref{eq:rte} 是关于位置变量 $\br\in\mathbb{R}^3$ 和角度变量 $\bOmega\in\sS^2$ 的 6 维方程（对应 $d=3$）。
-
-% % 它可以被简化为低维方程。
-% 为了简化问题，我们考虑一种二维降维模型。
-
-% 在笛卡尔坐标系中，令
-% \begin{equation}
-%     \bOmega=(c,s,\zeta), \quad c =
-%         {\left(1-\zeta^{2}\right)}^{\frac{1}{2}} \cos\theta, \quad s =
-%         {\left(1-\zeta^{2}\right)}^{\frac{1}{2}} \sin\theta, \quad \text{for }|\zeta| \leq 1.
-% \end{equation}
-% 假设 $\mut, \mus$ 仅依赖于 $x, y$，且 $I$ 沿 $z$ 轴均匀分布。函数
-% \begin{equation}
-%     \tilde{I}(x, y,\zeta,\theta) = \frac{1}{2}[I(x,y,z,c,s,\zeta) + I(x,y,z,c,s,-\zeta)],
-% \end{equation}
-% 和
-% \begin{equation}
-%     \tilde{p}(\zeta,\theta,\zeta^*, \theta^*) = \frac{1}{2}[p(c,s,\zeta, c^*,s^*,\zeta^*) + p(c,s,\zeta, c^*,s^*,-\zeta^*)],
-% \end{equation}
-% 与 $z$ 无关且关于 $\zeta$ 是偶函数。因此，方程~\eqref{eq:rte} 简化为如下方程：
-% \begin{equation}
-%     \begin{split}
-%          & \left(c\partial_x \tilde{I}(x,y,\zeta,\theta)+s\partial_y \tilde{I}(x,y,\zeta,\theta)\right)+\mut \tilde{I}(x,y,\zeta,\theta)                                 \\
-%          & \qquad =\frac{\mus}{2\pi}\int_{0}^{1} \int_0^{2\pi} \tilde{p}(\zeta, \theta, \zeta^*,\theta^*) \tilde{I}(x,y,\zeta^*,\theta^*) \diff{\theta^*}\diff{\zeta^*},
-%     \end{split}
-% \end{equation}
-% 带有入射边界条件：
-% \begin{equation}
-%     \tilde{I}(x,y,\bOmega)=\tilde{I}_{-}(x,y,\bOmega), \quad \text{for }
-%     \bOmega\cdot\bm{n}<0,\quad (x, y)\in\partial D.
-% \end{equation}
 
 \subsection{各向同性与各向异性}
 
@@ -84,13 +52,14 @@ $g$ 越接近 1，前向散射峰越尖锐。尽管本文主要以 H-G 相函数
 \begin{equation}
     \int_{\sS^{d-1}} f(\bOmega) \diff{\bOmega} \approx \sum_{n=1}^N w_n f(\bOmega_n).
 \end{equation}
-由此，连续的输运方程转化为一组耦合的偏微分方程组，每个方程对应一个离散方向 $\bOmega_n$。虽然理论上可以直接利用高斯-若尔当消元法求解该线性方程组，但由于存储系数矩阵所需的内存开销巨大，这种直接解法在实际应用中往往面临困难。另一种更常用的途径是采用迭代法求解，其达到特定精度所需的迭代次数通常取决于介质散射作用的强弱。图~\ref{fig:sn_quadrature} 展示了 $S_6$ 角度离散的示意图~\footnote{\url{https://scale-manual.ornl.gov/XSD.html}}。
+由此，连续的输运方程转化为一组耦合的偏微分方程组，每个方程对应一个离散方向 $\bOmega_n$。虽然理论上可以直接利用高斯-若尔当消元法求解该线性方程组，但由于存储系数矩阵所需的内存开销巨大，这种直接解法在实际应用中往往面临困难。另一种更常用的途径是采用迭代法求解，其达到特定精度所需的迭代次数通常取决于介质散射作用的强弱。
+% 图~\ref{fig:sn_quadrature} 展示了 $S_6$ 角度离散的示意图~\footnote{\url{https://scale-manual.ornl.gov/XSD.html}}。
 
-\begin{figure}
-    \centering
-    \includegraphics[width=0.7\textwidth]{figures/dom.png}
-    \bicaption{$S_6$ 角度离散示意图。}{Ordering of the directions for an $S_6$ cylindrical set.}\label{fig:sn_quadrature}
-\end{figure}
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=0.7\textwidth]{figures/dom.png}
+%     \bicaption{$S_6$ 角度离散示意图。}{Ordering of the directions for an $S_6$ cylindrical set.}\label{fig:sn_quadrature}
+% \end{figure}
 
 角度求积点选取为区间 $[-1,1]$ 上 $2N$ 阶标准勒让德多项式的正根。此处我们取 $N=3$作为例子，具体的求积点和权重如表~\ref{tab:quadrature} 所示。表中符号 $\zeta_i, \theta_i, c_i, s_i$ 定义如下，分别对应速度空间坐标及其三角函数值，$w_i$ 为对应的求积权重：
 \begin{equation}
@@ -115,6 +84,243 @@ $g$ 越接近 1，前向散射峰越尖锐。尽管本文主要以 H-G 相函数
     \end{tabular}
     \caption{求积组的角度求积点和权重。$\zeta_i$ 和 $\theta_i$ 是速度空间的求积点，$c_i$ 和 $s_i$ 是对应的余弦和正弦值，$w_i$ 是求积权重。}\label{tab:quadrature}
 \end{table}
+
+\section{辐射输运问题解的结构}
+\label{sec:preliminaries}
+本节考察辐射传输方程（RTE）解算子的基本性质，这些性质构成后续构建神经网络模型的理论基础。
+
+首先，定义边界集合
+\begin{equation}\label{eq:boundary}
+    \Gamma_{\pm} := \{(\br,\bOmega) \mid \br\in\partial
+    D,\;\bOmega\in\sS^{d-1},\;\mp\bn(\br)\cdot\bOmega<0 \},
+\end{equation}
+其中 $\bn(\br)$ 表示区域 $D$ 在边界点 $\br\in\partial D$ 处的外法向单位向量。辐射强度 $I(\br,\bOmega)$ 满足带有入射边界条件的 RTE~\eqref{eq:rte}。
+
+上述边值问题涉及的系数函数包括总截面 $\mu_t$、散射截面 $\mu_s$ 以及散射核 $p$。吸收截面定义为 $\mu_a = \mu_t - \mu_s$。散射核 $p(\bOmega,\bOmega^*)$ 描述了粒子从方向 $\bOmega^*$ 散射至方向 $\bOmega$ 的概率密度。我们假设散射核满足互易性（即 $p(\bOmega,\bOmega^*) = p(\bOmega^*,\bOmega)$）及归一化条件：
+\begin{equation}
+    \frac{1}{S_{d-1}}\int_{\sS^{d-1}} p(\bOmega,\bOmega^*) \,\mathrm{d}\bOmega^* = 1
+    \quad\text{对几乎所有的 }\bOmega\in\sS^{d-1}.
+\end{equation}
+在许多应用场景中，通常还假设散射核具有旋转不变性，即 $p$ 仅依赖于散射角 $\theta = \arccos(\bOmega\cdot\bOmega^*)$。尽管本文提出的算法同样适用于一般散射核，为简化叙述，后文将基于该假设展开。
+
+\subsection{解结构}
+\label{sec:preliminaries-solution-structure}
+
+考虑式~\eqref{eq:rte} 的含体源项稳态辐射传输方程
+\begin{equation}
+    (\bOmega\cdot\nabla + \mu_t(\br)) I(\br,\bOmega)
+    - \frac{\mu_s(\br)}{S_{d-1}} \int_{\mathbb{S}^{d-1}} p(\bOmega,\bOmega^*) I(\br,\bOmega^*)\,\diff\bOmega^*
+    = q(\br,\bOmega),
+\end{equation}
+其中各符号含义同式~\eqref{eq:rte}。为简洁起见，定义线性算子
+\begin{equation}
+    \mathcal{L}[I(\br,\bOmega)]
+    = (\bOmega\cdot\nabla + \mu_t(\br)) I(\br,\bOmega)
+    - \frac{\mu_s(\br)}{S_{d-1}} \int_{\mathbb{S}^{d-1}} p(\bOmega,\bOmega^*) I(\br,\bOmega^*)\,\diff\bOmega^*,
+\end{equation}
+则含源辐射传输方程写作
+\begin{equation}
+    \mathcal{L}[I(\br,\bOmega)] = q(\br,\bOmega),
+\end{equation}
+这是一个非齐次线性积分-微分方程。求解思路是把任意体源 $q$ 拆解为位置-方向脉冲源的叠加，并用格林函数的线性叠加性得到总响应。
+
+首先，先用格林函数 $G(\br,\bOmega;\br',\bOmega')$ 乘原方程并在 $D\times\mathbb{S}^{d-1}$ 上积分，得到
+
+\begin{equation}
+    \int G\,\mathcal{L}[I]=\int G\,q.
+\end{equation}
+
+更具体地，记积分变量为 $(\br,\bOmega)$，并将 $(\br',\bOmega')$ 视为参数，有
+\begin{equation}
+    \int_{D}\int_{\mathbb{S}^{d-1}} G(\br,\bOmega;\br',\bOmega')\, \mathcal{L}[I(\br,\bOmega)]\diff\bOmega\diff\br
+    = \int_{D}\int_{\mathbb{S}^{d-1}} G(\br,\bOmega;\br',\bOmega')\, q(\br,\bOmega)\diff\bOmega\diff\br.
+\end{equation}
+
+然后分部积分，并用散度定理把导数从 $I$ 转移到 $G$。其中关键是对流项 $G(\bOmega\cdot\nabla I)$：注意 $\bOmega$ 与 $\br$ 无关，利用乘积求导
+\begin{equation}
+    \bOmega\cdot\nabla\bigl(GI\bigr)=G\,(\bOmega\cdot\nabla I)+I\,(\bOmega\cdot\nabla G),
+\end{equation}
+从而在对 $\br$ 积分时有
+\begin{equation}
+    \begin{aligned}
+        \int_{D}\int_{\mathbb{S}^{d-1}} G\,(\bOmega\cdot\nabla I)\diff\bOmega\diff\br
+         & = \int_{D}\int_{\mathbb{S}^{d-1}} \bOmega\cdot\nabla(GI)\diff\bOmega\diff\br
+        - \int_{D}\int_{\mathbb{S}^{d-1}} I\,(\bOmega\cdot\nabla G)\diff\bOmega\diff\br             \\
+         & = \int_{D}\int_{\mathbb{S}^{d-1}} \nabla\cdot\bigl(\bOmega\,GI\bigr)\diff\bOmega\diff\br
+        - \int_{D}\int_{\mathbb{S}^{d-1}} I\,(\bOmega\cdot\nabla G)\diff\bOmega\diff\br             \\
+         & = \int_{\partial D}\int_{\mathbb{S}^{d-1}} (\bOmega\cdot\bn)\,G\,I\diff\bOmega\diff S
+        - \int_{D}\int_{\mathbb{S}^{d-1}} I\,(\bOmega\cdot\nabla G)\diff\bOmega\diff\br,
+    \end{aligned}
+\end{equation}
+最后一步即对向量场 $\bOmega\,GI$ 应用散度定理
+\begin{equation}
+    \int_{D}\nabla\cdot(\bOmega\,GI)\diff\br=\int_{\partial D}(\bOmega\cdot\bn)GI\diff S.
+\end{equation}
+
+将上述对流项的结果与吸收/散射项合并，并将体积分中的导数项移到 $G$ 一侧，即得到
+\begin{equation}
+    \int_{D}\int_{\mathbb{S}^{d-1}} G\, \mathcal{L}[I] \diff\bOmega\diff\br
+    = \int_{D}\int_{\mathbb{S}^{d-1}} I\, \mathcal{L}^*[G] \diff\bOmega\diff\br
+    + \int_{\partial D}\int_{\mathbb{S}^{d-1}} (\bOmega\cdot\bn)\, I\, G \diff\bOmega\diff S,
+\end{equation}
+其中 $D$ 为求解区域，$\partial D$ 为其边界，$\bn$ 为外法向。其中，伴随算子 $\mathcal{L}^*$ 定义为
+\begin{equation}
+    \mathcal{L}^*[G] = - (\bOmega\cdot\nabla) G + \mu_t(\br) G
+    - \frac{\mu_s(\br)}{S_{d-1}} \int_{\mathbb{S}^{d-1}} p(\bOmega^*,\bOmega) G(\br,\bOmega^*;\br',\bOmega')\diff\bOmega^*.
+\end{equation}
+
+接下来，若$\mathcal{L}^*$满足脉冲源条件
+\begin{equation}
+    \mathcal{L}^*[G(\br,\bOmega;\br',\bOmega')] = \delta_{\{\br'\}}(\br)\,\delta(\bOmega-\bOmega'),
+\end{equation}
+其中 $\delta_{\{\br'\}}(\br)$ 与 $\delta(\bOmega-\bOmega')$ 分别表示空间（或边界）上的 Dirac 分布与角度空间中的 Dirac $\delta$ 函数，表示在源点 $(\br',\bOmega')$ 施加单位脉冲时，观测点 $(\br,\bOmega)$ 的辐射强度响应。将该条件代入第二步右端体积分中的 $\mathcal{L}^*[G]$，并利用 $\delta$ 的筛选性
+\begin{equation}
+    \int_{D}\int_{\mathbb{S}^{d-1}} I(\br,\bOmega)\,\delta_{\{\br'\}}(\br)\,\delta(\bOmega-\bOmega')\diff\bOmega\diff\br
+    = I(\br',\bOmega'),
+\end{equation}
+即可将体积分项化为待求量在 $(\br',\bOmega')$ 处的取值。
+
+将上述结果与第一步等式合并，可得到带边界项的中间恒等式
+\begin{equation}
+    \begin{aligned}
+        I(\br',\bOmega')
+         & + \int_{\partial D}\int_{\mathbb{S}^{d-1}} (\bOmega\cdot\bn)\, I(\br,\bOmega)\, G(\br,\bOmega;\br',\bOmega')\diff\bOmega\diff S \\
+         & = \int_{D}\int_{\mathbb{S}^{d-1}} G(\br,\bOmega;\br',\bOmega')\, q(\br,\bOmega)\diff\bOmega\diff\br.
+    \end{aligned}
+\end{equation}
+
+最后，将观测点记为 $(\br,\bOmega)$、源点记为 $(\br',\bOmega')$，得到含源 RTE 的格林函数积分解
+\begin{equation}
+    \begin{aligned}
+        I(\br,\bOmega)
+         & = \int_{D}\int_{\mathbb{S}^{d-1}} G(\br,\bOmega;\br',\bOmega')\, q(\br',\bOmega')\diff\bOmega'\diff\br'                                  \\
+         & \quad - \int_{\partial D}\int_{\mathbb{S}^{d-1}} (\bOmega'\cdot\bn') I(\br',\bOmega') G(\br,\bOmega;\br',\bOmega')\diff\bOmega'\diff S'.
+    \end{aligned}\label{eq:rte-green-source}
+\end{equation}
+散度定理将 $\bOmega\cdot\nabla$ 的体积分转化为边界积分，是伴随算子边界项的唯一来源。上式第一项对应体源的叠加贡献，第二项刻画边界入射或出射辐射的贡献；若边界无入射源（如真空或黑体），边界项为零，积分解仅保留体积分。
+
+需要强调的是，上述推导给出了含体源项情形的格林函数表示，而无源稳态问题可视为其特例：令 $q\equiv 0$ 时，体积分项消失，解仅由边界响应决定（对应~\eqref{eq:rte-green-source} 的边界项）。反过来，对于一般含源问题，解也可分解为“边界响应 + 体源响应”的叠加。由于 RTE 关于 $I_{-}$ 与 $q$ 都是线性的，这两类情形在形式上完全一致，差别仅在于激励项（右端源项与/或边界数据）的取法。后续为突出解算子结构并与网络设计建立对应关系，我们将主要讨论无源稳态边值问题的算子表述，但相关结论可在同一线性框架下自然推广到含源情形。
+
+\subsection{解的存在唯一性与解算子}
+
+本节回顾文献中关于稳态RTE解存在唯一性的相关结果。首先给出更一般情形下（即 $\mut$ 和 $\mus$ 同时依赖于 $\br$ 和 $\bm{v}$）在 $L^p$ 空间（$1\leq p\leq\infty$）中的存在唯一性定理。
+
+\begin{theorem}[$L^p$ 空间中解的存在唯一性]\label{thm:existence-uniqueness-lp}
+    假设：
+    \begin{enumerate}
+        \item 设 $\bm{v}=|\bm{v}|\bOmega\in V$，其中 $V\subset\mathbb{R}^3$ 为开集，$D\subset\mathbb{R}^d$ 为有界 Lipschitz 区域；
+        \item $\mut:D\times V \to \mathbb{R}$ 非负，且 $\tau\mut\in L^\infty(D\times V)$。其中 $\tau(\br,\bm{v})$ 表示过点 $\br$ 沿方向 $\bm{v}$ 的射线在 $D$ 内的线段长度；
+        \item $p: V\times V\to\mathbb{R}$ 非负且可测，并且
+              \begin{equation}
+                  \mua=\mut - \mus \geq 0.
+              \end{equation}
+    \end{enumerate}
+    则对任意 $1\leq p \leq\infty$ 及允许的边界数据 $I_{-}$，辐射传输问题~\eqref{eq:rte-with-bc} 存在唯一解 $I$，并满足估计
+    \begin{equation}
+        \|\tau^{-\frac{1}{p}}I\|_{L^p(D\times V)} \leq e^{C_p}\|I_{-}\|_{L^p(\Gamma_{-};|\bn\cdot\bOmega|)}, \quad \text{其中 }
+        C_p =\|\tau\mus\|_{L^\infty}.
+    \end{equation}
+    此外，若进一步假设 $\mut>0$，且存在某个 $\nu>0$ 使得
+    \begin{equation}
+        \frac{\mus}{\mut} \leq 1 - \nu,
+    \end{equation}
+    则有
+    \begin{equation}
+        \|\mut^{\frac{1}{p}}I\|_{L^p(D\times V)} \leq \nu^{-\frac{1}{p}}\|I_{-}\|_{L^p(\Gamma_{-};|\bn\cdot\bOmega|)},
+    \end{equation}
+    这一结果允许考虑 $\mut\to\infty$ 的极限情形，对渐近分析具有重要意义。
+\end{theorem}
+
+针对本文的具体设定及数值计算目标，我们主要采用下述定理，此时假设 $\mut$ 和 $\mus$ 仅依赖于空间位置 $\br$。在 $L^2(D\times\sS^{d-1})$ 空间中，存在唯一性表述如下。
+
+\begin{theorem}[$L^2$ 空间中解的存在唯一性]\label{thm:existence-uniqueness-l2}
+    假设区域 $D$ 有界，且 $\mua=\mut-\mus$、$\mus$ 与 $p$ 均为非负、有界、可测函数，即
+    \begin{equation}
+        \mua=\mut -\mus \geq 0, \quad \mus \geq 0, \quad \text{且} \quad \|\mua\|_{L^\infty(D)}<\infty, \|\mus\|_{L^\infty(D)}<\infty.
+    \end{equation}
+    并假设
+    \begin{equation}
+        \frac{1}{S_{d-1}}\int_{\sS^{d-1}}p(\bOmega,\bOmega^*)\,\mathrm{d}\bOmega^*=1, \quad\text{对几乎所有的 } \bOmega\in \sS^{d-1}.
+    \end{equation}
+    则对任意 $I_{-}\in L^2(\partial D\times\sS^{d-1})$，带边界条件的 RTE~\eqref{eq:rte-with-bc} 在 $L^2(D\times\sS^{d-1})$ 中存在唯一解 $I$。此外，存在常数 $C>0$，仅依赖于 $\text{diam}(D)$，$\|\mua\|_{L^\infty(D)}$ 和 $\|\mus\|_{L^\infty(D)}$，使得
+    \begin{equation}
+        \|\bOmega\cdot\nabla I\|_{L^2(D\times\sS^{d-1})}+\|I\|_{L^2(D\times\sS^{d-1})} \leq C \|I_{-}\|_{L^2(\partial D\times\sS^{d-1})},
+    \end{equation}
+\end{theorem}
+
+在上述存在唯一性结果基础上，我们定义解算子
+\begin{equation}
+    \A: (I_{-};\mu_t,\mu_s,p) \mapsto I,
+\end{equation}
+即算子 $\A$ 将边界入射强度 $I_{-}$、总截面 $\mut$、散射截面 $\mus$ 以及散射核 $p$ 映射为计算域内的解 $I$。需要注意的是，算子 $\A$ 关于 $I_{-}$ 是线性的，而关于其他系数函数则一般是非线性的。
+
+本文的目标是构造一种高效且精确的数值方法来近似解算子 $\mathcal{A}$。深入理解解算子的结构（即便仅是形式上的）对于设计高效且具有良好泛化能力的深度神经网络至关重要。为此，我们将 $\mathcal{A}$ 分解为若干计算上更易处理的子算子，从而为神经网络架构设计提供理论指导。
+
+\subsection{解算子的结构分解}
+
+为得到更便于分析与计算的解算子表示，我们将 RTE 改写为一个不动点方程。
+
+定义 $\tau_{\br,\bOmega}(s_1,s_2)$ 为沿特征线从 $\br-s_1\bOmega$ 到 $\br-s_2\bOmega$ 的光学深度（optical depth）：
+\begin{equation} \label{eq:optical-depth}
+    \tau_{\br,\bOmega}(s_1,s_2):=\int_{s_1}^{s_2} \mut(\br-s \bOmega) \,\mathrm{d}{s},
+\end{equation}
+并记 $s_{-}(\br,\bOmega)$ 为粒子沿方向 $\bOmega$ 从 $\br$ 逆向追溯至区域边界的距离：
+\begin{equation}
+    s_{-}(\br,\bOmega):= \inf \{s \geq 0 \mid \br-s\bOmega \in\partial D\}.
+\end{equation}
+
+首先考虑无散射的纯衰减问题：
+\begin{equation}\label{eq:rte-sweep}
+    \begin{aligned}\bOmega \cdot \nabla J_b(\br,\bOmega) + \mut(\br) J_b(\br,\bOmega) & = 0,                  &  & \text{在 } D\times\sS^{d-1}, \\
+               J_b|_{\Gamma_{-}}(\br, \bOmega)                                    & = I_{-}(\br,\bOmega), &  & \text{在 }\Gamma_{-},
+    \end{aligned}
+\end{equation}
+其解可表示为
+\begin{equation}\label{eq:attenuation-op}
+    J_b(\br, \bOmega)= \J I_{-}(\br, \bOmega) = e^{-\tau_{\br,\bOmega}(0,s_{-}(\br,\bOmega))} I_{-}\left(\br-s_{-}(\br, \bOmega)
+    \bOmega, \bOmega\right).
+\end{equation}
+其中 $\J$ 称为衰减算子（Attenuation Operator）。
+
+类似地，当源项 $I$ 已知时，方程
+\begin{equation}\label{eq:lifting}
+    (\bOmega\cdot\nabla + \mut)J = \mus I, \quad  J|_{\Gamma_{-}} = 0,
+\end{equation}
+的解为
+\begin{equation}\label{eq:lifting-op}
+    J=\cL I(\br, \bOmega) = \int_0^{s_{-}(\br, \bOmega)} e^{-\tau_{\br,\bOmega}(0,s)}\mus(\br-s\bOmega)I(\br-s\bOmega, \bOmega)\,\mathrm{d}{s},
+\end{equation}
+其中 $\cL$ 称为提升算子（Lifting Operator）。此外，定义散射算子
+\begin{equation}\label{eq:scattering-op}
+    \cS I(\br, \bOmega) = \frac{1}{S_{d-1}}\int_{\sS^{d-1}} p(\bOmega, \bOmega^*)I(\br, \bOmega^*) \,\mathrm{d}{\bOmega^*}.
+\end{equation}
+
+通过对算子 $\bOmega \cdot \nabla + \mut(\br)$ 求逆，RTE 边值问题可改写为积分形式的算子方程
+\begin{equation}\label{eq:rte-op-form}
+    I = \cL\cS I + \J I_{-},
+\end{equation}
+即一个第二类 Fredholm 积分方程，其中 $\cL\cS I$ 表示散射贡献，$\J I_{-}$ 表示边界条件贡献。
+
+该方程可通过不动点迭代求解：
+\begin{equation}\label{eq:fixed-point-iteration}
+    I^{m+1} = \cL\cS I^m + \J I_{-}.
+\end{equation}
+当初始猜测取为 $I^0 = \J I_{-}$ 时，该迭代与经典的源迭代方法
+~\cite{adams2002fast}形式一致。进一步地，根据~\cite{egger2014lp} 的结论，我们有如下定理：
+\begin{theorem}[谱半径估计]\label{thm:spectral-radius}
+    在定理~\ref{thm:existence-uniqueness-lp} 的假设条件下，对任意 $1\leq p\leq \infty$，不动点算子 $\cL\cS$ 的谱半径满足
+    \begin{equation}
+        \rho_p(\cL\cS) := \lim_{n\to\infty}\sqrt[n]{\| (\cL\cS)^n \|_{L^p(D\times V;\tau^{-1})}} \leq 1 - e^{-C_p} < 1.
+    \end{equation}
+    这表明谱半径被一致地界定在 1 之下，从而保证迭代收敛到 RTE 的唯一解。
+\end{theorem}因此，解算子可展开为级数形式：
+\begin{equation}\label{eq:soln-op-series}
+    \A[\mu_t,\mu_s,p] I_{-} = \sum_{n=0}^\infty(\cL\cS)^n\J I_{-}.
+\end{equation}
+这一迭代结构为神经网络架构设计提供了重要启发，我们可以设计一个深度网络的框架自然地对应这一迭代过程。
+
+在传统文献中，散射截面 $\mus$ 往往被并入散射算子 $\mathcal{S}$，而不是包含在提升算子 $\mathcal{L}$ 中。
+但是在本文中，提升算子 $\mathcal{L}$ 负责刻画沿特征线的传输性质，$\mathcal{S}$ 主要处理角度耦合。因此为了适配本文所提出模型的特定结构，我们将 $\mus$ 放置于 $\mathcal{L}$ 中。这样的划分既便于在框架中有效整合 $\mus$，又保持了与网络结构设计之间的协调一致。
 
 \section{传统数值方法}
 
@@ -295,12 +501,12 @@ $g$ 越接近 1，前向散射峰越尖锐。尽管本文主要以 H-G 相函数
     \end{cases}
 \end{equation}
 其中，Sigmoid 和 $\tanh$ 可视为对理想阶跃函数的平滑近似，分别将输入压缩到 $(0,1)$ 和 $(-1,1)$ 区间；而 ReLU 则通过简单的分段线性结构在保持非线性的同时兼顾了计算效率与优化稳定性。
-图~\ref{fig:activation_functions} 展示了上述三种常用激活函数的示意图。
-\begin{figure}
-    \centering
-    \includegraphics[width=0.8\textwidth]{figures/activation_function}
-    \bicaption{常用激活函数示意图。}{Common activation functions.}\label{fig:activation_functions}
-\end{figure}
+% 图~\ref{fig:activation_functions} 展示了上述三种常用激活函数的示意图。
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=0.8\textwidth]{figures/activation_function}
+%     \bicaption{常用激活函数示意图。}{Common activation functions.}\label{fig:activation_functions}
+% \end{figure}
 
 对于一个具体问题，假设其输入输出空间分别为$\mathcal{X}$和$\mathcal{Y}$, 神经网络旨在通过参数化的非线性映射 $f_{\bm{\theta}}: \mathcal{X} \to \mathcal{Y}$ 来近似某个目标函数 $f: \mathcal{X} \to \mathcal{Y}$。这里，$\bm{\theta}$ 表示神经网络中的所有可训练参数（如权重和偏置）。神经网络通常由多层神经元组成，每层神经元通过激活函数引入非线性变换，从而赋予网络强大的表达能力。
 
@@ -875,7 +1081,7 @@ FNO 的核心创新在于将上述积分算子在傅里叶空间中进行参数�
 
 这里，$\mathcal{R}_\phi$ 是傅里叶空间中一组可学习的复数权重，它作用于变换后的频率系数上，实现了高效的全局线性变换。
 
-一个完整的傅里叶层遵循“线性变换 + 非线性激活”的结构，其计算流程可分解为三步：
+一个完整的傅里叶层遵循先线性变换再非线性激活的结构，其计算流程可分解为三步：
 \begin{enumerate}
     \item \textbf{傅里叶变换：}对输入函数 $v_t(x)$ 进行傅里叶变换，得到其频率系数。
     \item \textbf{频率域线性变换：}用可学习权重 $\mathcal{R}_\phi$ 与频率系数进行点乘。在实际实现中，为平衡计算精度与效率，通常只保留前 $k_{\text{max}}$ 个低频模态，截断高频部分，从而显著减少参数量并增强模型的稳定性。
@@ -945,3 +1151,13 @@ Multi-Input DeepONet（MIO）~\cite{jin2022mionet}是 DeepONet 架构在处理�
 \end{equation*}
 
 MIO 通过这种设计，不仅保留了 DeepONet 处理连续算子的泛化能力，更重要的是具备了同步编码与融合多源输入函数的能力，使其在多物理场耦合、参数化偏微分方程求解等需要联合多条件建模的复杂场景中表现出显著优势。
+
+\section{本章总结}
+
+本章从辐射输运方程（RTE）的数学背景切入，详细梳理其作为高维积分微分方程的核心特征，以及解算子的基本表示形式与相关的存在唯一性定理，明确其将边界条件、截面系数与源项映射为辐射强度场的算子的形式。在此基础上，回顾求解该类方程的经典数值方法，包括离散纵标法（SN）的角度离散、有限体积法的空间离散，以及以扫掠法（Sweeping Method）为代表的迭代求解策略。
+
+接着，我们介绍神经网络的基本概念与核心组件，从多层感知机（MLP）的基础结构出发，延伸至激活函数、反向传播与基于梯度的优化算法等训练要素。后续还特别梳理了注意力机制、特征编码等在深度学习领域广泛应用的进阶模块，讨论其在捕捉非局部依赖与物理归纳偏置方面的潜力，为网络设计提供基础。
+
+随后，针对实际工程实现中模型规模与数据规模的双重增长，我们介绍数据并行的核心概念与主流实现方式，包括数据分片、梯度聚合与同步训练机制，以及其在 JAX 等现代计算框架中的高效实现模式，为后续多 GPU 大规模训练提供技术支撑。
+
+最后，我们聚焦于基于深度学习的偏微分方程（PDE）求解这一新兴范式，重点剖析两类代表性方法：一是以物理信息神经网络（PINN）为代表的物理约束驱动方法，通过将 PDE 残差直接嵌入损失函数实现无数据或少数据求解；二是以神经算子（Neural Operator）为代表的数据驱动算子学习方法，旨在学习无限维函数空间之间的映射，实现一次训练、多场景快速推理。在此框架下，我们详细介绍 DeepONet 及其多输入扩展 MIO（Multi-Input Operator）的网络结构与理论基础，指出其在处理多函数输入（如边界条件、多组截面系数）方面的优势，这些知识将直接应用于后续 DeepRTE 与 EfficientRTE 的架构对比中。

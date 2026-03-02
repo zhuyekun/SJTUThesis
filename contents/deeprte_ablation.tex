@@ -1,4 +1,4 @@
-\section{算子验证}\label{sec:ablation-study}
+\subsection{算子验证}\label{sec:ablation-study}
 
 DeepRTE 的架构设计旨在通过将 RTE 解算子分解为模拟沿特征线传输的衰减分量（算子 $\J$ 和 $\cL$）以及捕捉散射行为的散射分量（$\cS$），从而反映 RTE 解的数学结构，如前面章节所述。
 每个分量在 DeepRTE 中都通过独特的神经模块实现：衰减模块（第~\ref{sec:attenuation-module} 节）和散射模块（第~\ref{sec:scattering-module} 节）。
@@ -17,10 +17,11 @@ DeepRTE 的架构设计旨在通过将 RTE 解算子分解为模拟沿特征线�
     \item FNO 依赖傅里叶变换来捕捉全局（非局部）信息，但这种方法在高维 RTE 解空间（空间和角度维度）中面临重大挑战，导致计算和内存成本过高。在我们的初步测试中，这些成本使得在我们的计算预算内训练 FNO 变得不可行。
     \item RTE 在涉及空间和角度变量的相空间上运行，而 FNO 通常仅适用于空间域。调整 FNO 以处理角度依赖性需要进行非平凡的修改（例如，确定是否在角度域中应用傅里叶变换），这并不直接，并且对于此特定问题可能无效。
 \end{itemize}
+\todo[inline]{把这一段更改一下，前面已经有相似的部分了，这里可以更简洁地说明为什么不选 FNO 作为基线。}
 
 基于这些原因，我们将比较重点放在作为基线模型的 MIO 上。我们首先通过消融实验验证 DeepRTE 中衰减和散射模块的有效性。然后，我们在 RTE 解算子学习任务上比较 DeepRTE 与 MIO 的整体性能。
 
-\subsection{衰减模块的消融实验}
+\subsubsection{衰减模块的消融实验}
 
 衰减模块模拟不带散射效应的 RTE 传输行为。
 这种行为由两个关键过程表征：通过总截面 $\mut$ 的边界条件衰减（算子 $\J$，方程~\eqref{eq:attenuation-op}）和通过散射截面 $\mus$ 的体源衰减（提升算子 $\mathcal{L}$，方程~\eqref{eq:lifting-op}）。
@@ -115,7 +116,7 @@ DeepRTE 的架构设计旨在通过将 RTE 解算子分解为模拟沿特征线�
     \bicaption{衰减模块的消融实验。$\J$ 和 $\cL$ 算子的训练和评估结果，与 MIO（无任何 RTE 专用架构）进行对比。}{Ablation study of attenuation module. Training and evaluation of $\J$ and $\cL$ operators comparied to MIO (without any RTE specialized architecture) .}\label{tab:j_l_compare}
 \end{table}
 
-\subsection{散射模块的消融实验}
+\subsubsection{散射模块的消融实验}
 
 为了检验散射算子 $\cS$（方程~\ref{eq:scattering-op}）的必要性，我们采用反证法。我们假设 $\cS$ 是不必要的，并通过用等大小的多层感知机替换散射层（实现 $\cS$ 的组件）来测试这一点。
 我们将此修改后的架构表示为 $\ANN_{\text{w/o }\cS}$。
@@ -148,9 +149,7 @@ $\ANN_{\text{w/o }\cS}$ 与完整 DeepRTE $\ANN$ 之间的唯一区别在于散�
     \label{tab:ablation_g}
 \end{table}
 
-
 我们注意到，在我们的 DeepRTE 模型中，提升算子 $\cL$~\eqref{eq:lifting-op} 同时出现在衰减模块（见~\eqref{eq:L-op}，且由于 $\mus$ 包含在 $\tau_{-}^{\text{NN}}$ 和散射模块（见~\eqref{eq:scattering-mus}）中。这一设计选择反映了我们基于数学域分离操作的架构原则：衰减模块处理沿特征线作用于空间变量的算子（由注意力机制捕捉），而散射模块处理作用于角度变量的算子（由角度积分捕捉）。这种分离简化了模型架构，并通过重复模块化块促进了可扩展性。
-
 
 \subsection{与 MIO 的整体对比}
 

@@ -1,36 +1,16 @@
-\section{训练方法}
-\label{sec:training}
 
-本节介绍用于训练神经网络模型的整体框架。该模型旨在近似辐射传输方程（RTE）中的格林函数。我们的做法基于 Delta 函数数据集：通过高斯函数近似边界条件，构造一族“类 Dirac”的入射边界源。借助这一设计，即便模型在训练阶段只接触到 Delta 型边界条件，仍能对未见过的一般边界条件保持良好的外推能力，其作用类似于预训练：先在通用任务上学习可迁移的算子结构，再迁移到具体边界条件上。下面将分别介绍训练数据集的构造、基于均方误差的损失函数以及基于相对误差的评估指标。
+本节给出神经网络模型的整体训练框架，分为两部分：第一部分介绍 DeepRTE 的训练方法，主要面向无源项稳态输运方程；第二部分介绍 EfficientRTE 的训练方法，主要面向含体源项的稳态输运方程。
 
-\subsection{RTE 数据集特征}
+需要说明的是，这两种方法都可以解稳态输运方程（可见），本文在此分别选取两种情形，旨在更清晰地展示两种方法各自的优势与适用场景。
 
-为便于实现与复现实验，我们将每个训练样本的输入与输出统一组织为若干张量特征，见表~\ref{tab:rte_features}。
+\section{DeepRTE训练方法}
 
-\begin{table}[!htp]
-    \centering
-    \begin{tabular}{lll}
-        \toprule
-        特征形状                                              & 描述                                                       \\
-        \midrule
-        \texttt{phase\_coords}: $[N_{\text{coords}},2d]$  & 相空间坐标 $(\br, \bOmega)$                                   \\
-        \texttt{boundary\_coords}: $[N_{\text{bc}},2d]$   & 边界相空间坐标 $(\br^{\prime}, \bOmega^{\prime})$               \\
-        \texttt{boundary\_weights}: $[N_{\text{bc}}]$     & 边界求积权重 $\omega_i$                                        \\
-        \texttt{position\_coords}: $[N_{\text{mesh}},2d]$ & 系数采样网格点 $(\br^{\text{mesh}})$                            \\
-        \texttt{velocity\_coords}: $[N_{\text{quad}},2d]$ & 角度求积点 $\bOmega^{*}$                                      \\
-        \texttt{velocity\_weights}: $[N_{\text{quad}}]$   & 角度求积权重 $\omega_i$                                        \\
-        \texttt{boundary}: $[N_{\text{bc}}]$              & 边界入射强度 $I(\br^{\prime}, \bOmega^{\prime})$               \\
-        \texttt{mu}: $[N_{\text{mesh}},2]$                & 截面 $\mus(\br^{\text{mesh}})$ 与 $\mut(\br^{\text{mesh}})$ \\
-        \texttt{scattering\_kernel}: $[N_{\text{quad}}]$  & 散射核 $p(\bOmega, \bOmega^*)$                              \\
-        \bottomrule
-    \end{tabular}
-    \bicaption{DeepRTE 数据集特征。}{DeepRTE features. }\label{tab:rte_features}
-\end{table}
+\todo[inline]{检查一下有没有什么字母是后面先用的，前面没有定义的！}
 
-在构造训练数据集时，每个样本包含：相空间坐标、入射边界函数 $I_-$、散射截面 $\mus$、总截面 $\mut$、相函数 $p$ 以及对应的辐射强度 $I$。这些物理量在理论上均为连续函数，在数值实现中则通过有限个离散采样点加以近似。表~\ref{tab:rte_features} 汇总了每个训练样本中包含的全部特征。在表中，$N_\text{coords}$ 表示相空间采样点数，$N_\text{bc}$ 为边界采样点数，$N_\text{mesh}$ 为系数采样点数，$N_\text{quad}$ 为角度求积点数。
-
-\paragraph{无网格采样}
-训练数据集通过完全无网格（mesh-free）的随机采样生成。所有特征的采样数量 $N_{\text{coords}}$、$N_{\text{bc}}$、$N_{\text{mesh}}$ 与 $N_{\text{quad}}$ 彼此独立，可根据问题复杂度与计算资源灵活调整。这一设计避免了对固定网格的依赖，使模型更易迁移到不同几何与系数分布下。
+我们首先构造一类 Delta 型训练数据集：通过高斯核对边界 Dirac 源进行平滑，从而得到一族近似 Delta 的入射边界条件。
+借助这一设计，模型在训练阶段即便只接触到 Delta 型边界条件，也能够依托算子关于边界条件的线性结构，通过线性叠加自然推广到一般边界条件，并保持良好的外推能力。
+其作用可类比于预训练：先在通用的“基函数”任务上学习可迁移的算子结构，再迁移到具体边界条件与算例上。
+下面将分别介绍训练数据集的构造、基于均方误差的损失函数，以及基于相对误差的评估指标。
 
 \subsection{Delta 函数训练数据集}
 
@@ -228,3 +208,91 @@
     \text{RMSPE} = \sqrt{\frac{\displaystyle\sum^{N_{\text{mesh}}}_{i=1} |\Phi^{\text{NN}}(\br_i) - \Phi(\br_i)|^2}{\displaystyle\sum^{N_{\text{mesh}}}_{i=1}|\Phi(\br_i)|^2}}\times 100\%.
 \end{equation}
 该指标在不同算例和系数分布之间具有良好的可比性，因而被用于本文所有数值实验的统一评估标准。
+
+\section{EfficientRTE训练方法}
+
+本节针对含体源项的稳态辐射输运方程，介绍EfficientRTE的训练框架。与DeepRTE类似，我们仍采用扫掠法生成参考数据，但在边界条件、源项构造、训练策略上进行针对性设计。整体流程分为“含源项数据集构造”，“两阶段损失函数与训练”“精度评估”三部分。
+
+\subsection{含源项数据集构造}
+
+数据集构造在DeepRTE基础上调整两点：采用齐次入射边界条件，并引入高斯随机场体源项。数据生成逻辑可在 \href{https://github.com/mazhengcn/rte-dataset}{rte-dataset} 仓库复现。
+
+\subsubsection{边界条件与参考解生成}
+采用齐次入射边界条件：
+\begin{equation}
+    I\big|_{\Gamma_-} = 0,
+\end{equation}
+其中 $\Gamma_- = \{(\boldsymbol{r},\boldsymbol{\Omega}):\boldsymbol{r}\in\partial D, \boldsymbol{\Omega}\cdot\boldsymbol{n}<0\}$。参考解仍由多GPU快速扫掠法生成（见第~\ref{sec:fast-sweeping-gpu} 节）。
+
+\subsubsection{高斯随机场体源项}
+为模拟空间分布复杂的体源，我们采用基于频域功率谱的二维高斯随机场（GRF）生成 $q(\boldsymbol{r})$（角度上各向同性，即 $q(\boldsymbol{r},\boldsymbol{\Omega})=q(\boldsymbol{r})$）。
+
+具体步骤为：
+\begin{enumerate}
+    \item \textbf{构造频域功率谱}：在 $N_{\text{mesh}}\times N_{\text{mesh}}$ 均匀网格上，利用 \texttt{fftfreq} 构造离散频率网格 $k_x,k_y$，定义功率谱：
+          \begin{align}
+              k^2(k_x,k_y)         & := k_x^2 + k_y^2, \quad k^2(0,0) := 1,                                \\
+              \widehat{P}(k_x,k_y) & := \bigl(k^2(k_x,k_y)\bigr)^{-\alpha/2}, \quad \widehat{P}(0,0) := 0,
+          \end{align}
+          其中 $\alpha$ 控制随机场平滑度（$\alpha$ 越大，场越平滑），$\widehat{P}(0,0)=0$ 用于去除常数模态。
+
+    \item \textbf{生成随机场}：逐点采样复高斯噪声 $\xi(k_x,k_y) \sim \mathcal{CN}(0,1)$，施加功率谱后经逆快速傅里叶变换（IFFT）得到物理空间场：
+          \begin{align}
+              \widehat{q}(k_x,k_y) & := \sqrt{\widehat{P}(k_x,k_y)}\,\xi(k_x,k_y),   \\
+              q(\boldsymbol{r})    & := \Re\bigl(\mathrm{IFFT}_2(\widehat{q})\bigr).
+          \end{align}
+
+    \item \textbf{归一化}：将 $q(\boldsymbol{r})$ 最小-最大归一化到 $[0,1]$ 区间：
+          \begin{equation}
+              q \leftarrow \frac{q-\min(q)}{\max(q)-\min(q)}.
+          \end{equation}
+\end{enumerate}
+
+训练数据采用与rte-dataset兼容的格式，每个样本包含：空间/角度网格坐标、宏观截面 $\mu_t/\mu_s$、体源项 $q$、齐次边界条件、扫掠法参考解 $I_{\text{ref}}$。
+
+\subsection{损失函数与训练策略}
+
+EfficientRTE采用编码器预训练到解码器训练的两阶段策略，分别对应源项基函数学习与格林函数系数学习。
+
+\subsubsection{编码器预训练（源项重构）}
+编码器的目标是学习源域基函数 $\{\phi_k^{\text{NN}}\}$，将任意体源项 $q$ 映射为低维系数向量 $\boldsymbol{q}$。
+
+\textbf{损失函数}：源项重构均方误差（MSE）：
+\begin{equation}
+    \mathcal{L}_\phi(\boldsymbol{\theta}_\text{enc}) = \frac{1}{N}\sum_{n=1}^N \frac{1}{N_{\text{mesh}}} \sum_{i=1}^{N_{\text{mesh}}} \left| q_n(\boldsymbol{r}_i) - \sum_{k=1}^K q_{n,k}\,\phi_k^{\text{NN}}(\boldsymbol{r}_i) \right|^2,
+\end{equation}
+其中 $q_{n,k} = \int_D q_n(\boldsymbol{r})\,\phi_k^{\text{NN}}(\boldsymbol{r})\,\mathrm{d}\boldsymbol{r}$ 为源项在基函数上的展开系数，$\boldsymbol{\theta}_\text{enc}$ 为编码器参数。
+
+预训练完成后，固定编码器参数并计算基函数的Gram矩阵：
+\begin{equation}
+    \boldsymbol{W}[k_1,k_2] = \int_D \phi_{k_1}^{\text{NN}}(\boldsymbol{r})\,\phi_{k_2}^{\text{NN}}(\boldsymbol{r})\,\mathrm{d}\boldsymbol{r}.
+\end{equation}
+
+\subsubsection{解码器训练（辐射强度拟合）}
+解码器复用DeepRTE的衰减/散射模块，并新增线性层映射到 $K$ 维基函数系数 $\boldsymbol{G}^{\text{NN}}(\boldsymbol{r},\boldsymbol{\Omega})$。
+
+\textbf{损失函数}：辐射强度拟合MSE：
+\begin{equation}
+    \mathcal{L}_G(\boldsymbol{\theta}_\text{dec}) = \frac{1}{N}\sum_{n=1}^N \frac{1}{N_{\text{col}}} \sum_{i=1}^{N_{\text{col}}} \left| I_{\text{ref},n}(\boldsymbol{r}_i,\boldsymbol{\Omega}_i) - \boldsymbol{G}^{\text{NN}}(\boldsymbol{r}_i,\boldsymbol{\Omega}_i)^\top \boldsymbol{W} \boldsymbol{q}_n \right|^2,
+\end{equation}
+其中 $\boldsymbol{\theta}_\text{dec}$ 为解码器参数，$N_{\text{col}}$ 为随机采样的配点数。
+
+训练时固定编码器参数与Gram矩阵 $\boldsymbol{W}$，仅优化解码器参数；也可根据需要采用端到端联合训练，同时微调 $\boldsymbol{\theta}_\text{enc}$ 与 $\boldsymbol{\theta}_\text{dec}$。
+
+\subsection{精度指标与模型评估}
+
+评估指标与DeepRTE保持一致，便于跨方法对比：
+\begin{enumerate}
+    \item \textbf{密度MSE}：角度积分后的能量密度均方误差：
+          \begin{equation}
+              \text{MSE} = \frac{1}{N_{\text{mesh}}}\sum_{i=1}^{N_{\text{mesh}}} \big| \Phi^{\text{NN}}(\boldsymbol{r}_i) - \Phi_{\text{ref}}(\boldsymbol{r}_i) \big|^2,
+          \end{equation}
+          其中 $\Phi(\boldsymbol{r}) = \frac{1}{S^{d-1}}\int_{\mathbb{S}^{d-1}} I(\boldsymbol{r},\boldsymbol{\Omega})\,\mathrm{d}\boldsymbol{\Omega}$。
+
+    \item \textbf{密度RMSPE}：均方根百分比误差，用于跨算例对比：
+          \begin{equation}
+              \text{RMSPE} = \sqrt{\frac{\sum_{i=1}^{N_{\text{mesh}}} |\Phi^{\text{NN}}(\boldsymbol{r}_i) - \Phi_{\text{ref}}(\boldsymbol{r}_i)|^2}{\sum_{i=1}^{N_{\text{mesh}}} |\Phi_{\text{ref}}(\boldsymbol{r}_i)|^2}} \times 100\%.
+          \end{equation}
+\end{enumerate}
+
+此外，可补充编码器重构精度评估（源项的MSE/RMSPE），用于验证基函数的表达能力。
