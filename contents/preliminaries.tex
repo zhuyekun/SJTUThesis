@@ -416,6 +416,7 @@ $g$ 越接近 1，前向散射峰越尖锐。尽管本文主要以 H-G 相函数
 即可得到连接单元四个边中心未知量的有限差分格式。
 
 \subsection{各向异性情形：源迭代方法}
+\label{sec:source-iteration}
 
 当考虑各向异性散射时，散射源项不仅依赖于标量通量，还依赖于角通量的高阶矩，导致角度耦合显著增强。为了解决这一困难，源迭代（source iteration, SI）成为一种标准的解法。SI 的核心思想是利用上一次迭代的辐射强度来计算散射项，将其视为固定的“源”，从而将复杂的积分-微分方程转化为一系列独立的微分方程求解。
 
@@ -524,13 +525,15 @@ $g$ 越接近 1，前向散射峰越尖锐。尽管本文主要以 H-G 相函数
 
 近年来，Transformer 已成为深度学习中最具代表性的网络结构之一。自 Vaswani 等人于 2017 年提出“Attention Is All You Need”~\cite{vaswani2017attention}以来，Transformer 系列模型在机器翻译、自然语言理解与生成等任务中表现突出，并逐步拓展至计算机视觉、语音处理及科学计算等领域。其核心思想是以基于注意力机制的并行计算结构替代传统循环神经网络的时间递推，从而更高效地建模长程依赖，并提升训练与推理效率。
 
-在 Transformer 架构中，最关键的组成部分就是自注意力（self-attention）机制。直观地说，注意力机制通过对一组输入元素进行“加权平均”来得到输出，其中权重并非预先固定，而是根据当前任务需求由网络动态计算，从而实现“在不同上下文中关注不同位置”的效果。相比于卷积和循环网络，自注意力一方面能够在一次计算中同时建模序列中任意两位置之间的依赖关系，另一方面也更易于在 GPU/TPU 上实现高度并行，因此成为 Transformer 及其变体的基础算子。图~\ref{fig:attention_mechanism} 展示了注意力机制的基本工作流程~\footnote{\url{https://en.wikipedia.org/wiki/Attention_(machine_learning)}}。
+在 Transformer 架构中，最关键的组成部分就是自注意力（self-attention）机制。直观地说，注意力机制通过对一组输入元素进行“加权平均”来得到输出，其中权重并非预先固定，而是根据当前任务需求由网络动态计算，从而实现“在不同上下文中关注不同位置”的效果。相比于卷积和循环网络，自注意力一方面能够在一次计算中同时建模序列中任意两位置之间的依赖关系，另一方面也更易于在 GPU/TPU 上实现高度并行，因此成为 Transformer 及其变体的基础算子。
 
-\begin{figure}
-    \centering
-    \includegraphics[width=0.8\textwidth]{figures/Attention_mechanism_overview}
-    \bicaption{注意力机制示意图。}{Schematic diagram of the attention mechanism.}\label{fig:attention_mechanism}
-\end{figure}
+% 图~\ref{fig:attention_mechanism} 展示了注意力机制的基本工作流程~\footnote{\url{https://en.wikipedia.org/wiki/Attention_(machine_learning)}}。
+
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=0.8\textwidth]{figures/Attention_mechanism_overview}
+%     \bicaption{注意力机制示意图。}{Schematic diagram of the attention mechanism.}\label{fig:attention_mechanism}
+% \end{figure}
 
 从数学形式上看，注意力可统一表述为如下计算框架：给定查询（query）向量 $Q$、键（key）向量 $K$ 与值（value）向量 $V$，先由 $Q$ 与 $K$ 的相似度构造注意力权重，再用该权重对 $V$ 做加权汇聚。以序列长度为 $n$、隐藏维度为 $d$ 的表示为例，记
 \[
@@ -1035,6 +1038,7 @@ PINN 的训练过程旨在同时最小化观测数据（或边界/初始条件�
 这里 $\{t_u^i, x_u^i, u^i\}_{i=1}^{N_u}$ 表示初始和边界上的训练数据点，$\{t_f^i, x_f^i\}_{i=1}^{N_f}$ 表示用于计算物理残差的配点（collocation points）。通过最小化该损失函数，网络参数 $\bm{\theta}$ 被优化，从而使得神经网络 $u(t, x)$ 既符合观测数据又满足物理方程约束。
 
 \subsection{神经算子}
+\label{sec:neural-operator}
 神经算子（Neural Operator）代表了深度学习求解 PDE 的另一种范式。与 PINN 针对特定方程实例求解单一解 $u(t,x)$ 不同，神经算子旨在学习从一个函数空间到另一个函数空间的映射算子。
 
 从数学角度来看，设 $D \subset \mathbb{R}^d$ 为一个有界区域，$\mathcal{A}$ 和 $\mathcal{U}$ 分别为定义在 $D$ 上的巴拿赫空间（Banach spaces）。其中，$\mathcal{A}$ 通常对应于输入参数的函数空间（如初始条件、边界条件或方程系数），$\mathcal{U}$ 则对应于解函数的空间。神经算子的核心目标是学习一个非线性算子 $\mathcal{G}: \mathcal{A} \to \mathcal{U}$，使得对于任意输入函数 $a \in \mathcal{A}$，其映射得到的解 $u = \mathcal{G}(a)$ 满足特定的物理定律（通常由 PDE 描述）。具体而言，对于区域内的任意点 $x \in D$，解函数的值可表示为 $u(x) = (\mathcal{G}(a))(x)$。

@@ -282,7 +282,7 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
 
 衰减模块的整体结构见图~\ref{fig:attenuation-module}，该图展示了网络将空间坐标 ($\br,\br'$)、角度变量 ($\bOmega,\bOmega'$) 和截面 ($\mut,\mus$) 作为输入。OpticalDepthNet 子模块首先计算沿特征线的光学深度 $\tau_-^{\text{NN}}$。然后，这些特征由 MLP 处理，生成截断的格林函数表示 $\bG^{\text{NN}}\in\mathbb{R}^{d_{\text{model}}}$，该表示在离散点 $\br-s_i\bOmega$（特征线上的圆圈）处对辐射场进行采样。该架构有效地捕捉了局部散射效应和非局部衰减，同时通过降维保持了计算的可处理性。
 
-更多算法细节可以参考算法~\ref{alg:attenuation-module}。光学深度网络 $\tau_-^{\text{NN}}$（OpticalDepthNet）的细节将在下一小节中给出。
+更多算法细节可以参考算法~\ref{alg:code-attenuation-module}。光学深度网络 $\tau_-^{\text{NN}}$（OpticalDepthNet）的细节将在下一小节中给出。
 
 \begin{figure}
     \centering
@@ -408,7 +408,7 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
         {(\theta^\text{mesh}_\text{local})}_i & = {(r^\text{mesh}_\text{local})}_i / \| \br^\text{mesh}_i - \br \|,
     \end{cases}
 \end{equation}
-参见算法~\ref{alg:relative-position-encoding}，然后
+参见算法~\ref{alg:code-relative-position-encoding}，然后
 \begin{equation}
     c(\br-s_j\bOmega, \br^{\text{mesh}}_i) = c\left(s_j; {(r^\text{mesh}_\text{local})}_i, {(\theta^\text{mesh}_\text{local})}_i\right).
 \end{equation}
@@ -456,7 +456,7 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
 
 实现中，我们用法向量为速度反方向的半平面生成掩码 $M$，从而屏蔽远离特征线的网格点（见图~\ref{fig:mask}）。掩码的宽度可按需求调节：更宽的范围捕捉更复杂的光学深度变化，更窄的范围则进一步提升计算速度。
 
-综合上述要素，可得到算法~\ref{alg:optical-depth-net} 所示的 OpticalDepthNet 计算流程：
+综合上述要素，可得到算法~\ref{alg:code-optical-depth-net} 所示的 OpticalDepthNet 计算流程：
 
 % \begin{algorithm}[htp!]
 %     \caption{光学深度网络（Optical Depth Network）}\label{alg:optical-depth-net}
@@ -524,7 +524,7 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
 
 图~\ref{fig:scattering-block}表示模拟算子 $\cS$ 作用一次的结果。包括积分的加权求和、线性投影和激活。
 
-\noindent 散射模块的详细算法在算法~\ref{alg:scattering-module}中提供。
+\noindent 散射模块的详细算法在算法~\ref{alg:code-scattering-module}中提供。
 
 % \begin{algorithm}[htp!]
 %     \caption{散射模块（Scattering Module）}\label{alg:scattering-module}
@@ -621,7 +621,7 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
 \end{equation}
 其中 $\bm{W}^{\ell} \in \mathbb{R}^{d_{\text{model}}\times d_{\text{model}}}$ 以数据驱动的方式编码了传输物理和数值求积权重。
 
-散射块的详细计算步骤在算法~\ref{alg:scattering-block} 中给出。
+散射块的详细计算步骤在算法~\ref{alg:code-scattering-block} 中给出。
 
 % \begin{algorithm}[htp!]
 %     \caption{散射块（Scattering Block）}\label{alg:scattering-block}
@@ -668,7 +668,7 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
 \end{equation}
 我们观察到 $\tau(0,s'_j)$ 可以使用类似于我们衰减模块的基于注意力的架构来建模。完整的计算序列——评估 $\tau(0,s'_j)$、应用指数以及乘以 $\mus$——由神经网络端到端地近似。
 
-在具体实现中，该网络与 $\tau^{NN}_{-,t}$ 一并集成在衰减模块中，$\mathrm{OpticalDepthNet}$ 的输出为拼接后的向量 $\tau_- = \mathrm{Concat}(\tau^{NN}_{-,t}, \tau^{NN}_{-,s})$。这一设计在算法~\ref{alg:optical-depth-net} 中被形式化，其中
+在具体实现中，该网络与 $\tau^{NN}_{-,t}$ 一并集成在衰减模块中，$\mathrm{OpticalDepthNet}$ 的输出为拼接后的向量 $\tau_- = \mathrm{Concat}(\tau^{NN}_{-,t}, \tau^{NN}_{-,s})$。这一设计在算法~\ref{code-optical-depth-net} 中被形式化，其中
 \begin{equation}
     \tau_- = \mathrm{Concat}\left(\tau^{NN}_{-,t}, \tau^{NN}_{-,s}\right) = \mathrm{OpticalDepthNet}\left(\br,\bOmega; \{\br^{\mathrm{mesh}}_i\}, \left\{(\mu_t^{\mathrm{mesh}}, \mu_s^{\mathrm{mesh}})_i\right\}\right) \in \mathbb{R}^{d_{\tau}},
 \end{equation}
@@ -704,5 +704,5 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
     \bm{w}^\cL_{ij} = \tilde{w}_j^{\br-s'_i \bOmega, \bOmega} \,\mus(\br-s'_j\bOmega)\, e^{-\tau^{NN}_{-,s}(0,s'_j)}.
 \end{equation}
 最后将上述的 $\bm{G}^0$ 输入到~\eqref{scattering_layer}中进行散射模块的实现，最后的迭代网络结构与之前保持一致。上述实现更改了散射模块的输入形式，但并未改变散射块的结构，使得网络满足了物理意义上的 $\bm{w}^\cL_{ij}$ 形式。
-第二种实现则是我们在前文中介绍的直接学习 $\bm{W}^\ell$ 的方式。将$\mut$，$\mus$拼接在一起作为OpticalDepthNet的输入，详情见算法~\ref{alg:optical-depth-net}。
+第二种实现则是我们在前文中介绍的直接学习 $\bm{W}^\ell$ 的方式。将$\mut$，$\mus$拼接在一起作为OpticalDepthNet的输入，详情见算法~\ref{alg:code-optical-depth-net}。
 实验结果表明，这两种方式的表现相差无几。这说明，我们将$\mut$，$\mus$作为衰减输入的设计是合理且有效的。
