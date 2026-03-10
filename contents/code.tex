@@ -1,5 +1,7 @@
 \chapter{代码实现与工程优化}
 
+本章聚焦辐射输运方程神经算子求解方法的工程化落地，系统完成了核心算法的代码实现、性能优化与对比基线构建。首先介绍代码库的整体架构、开发环境与技术选型原则；其次阐述辐射输运求解场景的数据集构建与标准化预处理流程；随后分别详细说明 DeepRTE 与 EfficientRTE 两大模型的代码实现细节，涵盖网络设计、训练管线与核心算子优化，并通过伪代码呈现核心执行流程；最后为保障对比实验的公平性，完成了多 GPU 并行优化快速扫掠法与传统神经算子基线模型的工程实现，为所提方法提供了统一的精度参考与性能对比标尺。
+
 \section{开发环境与整体架构}
 本章所有代码均基于JAX AI 技术栈构建，核心依赖包括 JAX 数值计算框架、Flax 神经网络库、Optax 优化器库与 Orbax 检查点管理库，同时支持 NVIDIA GPU 硬件加速与 Docker 容器化部署，可兼容单机多卡与多机分布式训练场景。
 
@@ -18,7 +20,9 @@
 
 \section{数据集构建与预处理}
 
-为便于实现与复现实验，我们将每个训练样本的输入与输出统一组织为若干张量特征，见表~\ref{tab:rte_features}。
+本小节主要描述了数据集的构建，本文使用的数据集托管在\href{https://github.com/mazhengcn/rte-dataset}{rte-dataset数据集}，其开源地址为\url{https://github.com/mazhengcn/rte-dataset}，以python实现，整个代码过程包括数据的生成以及处理，可随时复现。
+
+我们将每个训练样本的输入与输出统一组织为若干张量特征，见表~\ref{tab:rte_features}。
 
 \begin{table}[!htp]
     \centering
@@ -50,8 +54,8 @@
 
 \section{DeepRTE 训练实现}
 
-本节系统阐述DeepRTE模型的代码实现与训练流程，核心思想是通过神经网络显式建模辐射输运方程的格林函数解算子，基于JAX AI技术栈构建物理驱动训练框架。整体实现遵循模块化、可扩展设计，将网络结构、核心物理算子、训练逻辑与并行策略解耦，在严格落地物理约束的同时，充分发挥JAX的自动微分、即时编译与并行计算优势。
-
+本节系统阐述DeepRTE模型的代码实现与训练流程，核心思想是通过神经网络显式建模辐射输运方程的格林函数解算子。整体实现遵循模块化、可扩展设计，将网络结构、核心物理算子、训练逻辑与并行策略解耦， 在实现上充分发挥JAX的自动微分、即时编译与并行计算优势。整个网络框架以及训练流程，复现脚本都可见我们发布的开源项目\href{https://github.com/mazhengcn/deeprte/tree/main}{DeepRTE}，
+其地址为\url{https://github.com/mazhengcn/deeprte/tree/main}。
 \subsection{整体训练流程}
 
 训练流程围绕物理约束损失函数展开，核心步骤包括参数初始化、前向传播、损失计算、反向传播与参数更新。损失函数由边界条件损失与方程残差损失构成，分别约束模型在边界上的精度与在域内满足辐射输运方程的程度。
@@ -272,7 +276,8 @@ DeepRTE充分利用JAX的并行原语实现高效多GPU训练，核心采用数�
 
 \section{EfficientRTE 训练实现}
 
-本节系统阐述EfficientRTE模型的代码实现与训练流程（具体流程与理论见章节~\ref{chap:prte}），核心思想是通过基函数展开与编码器-解码器架构，将含源项辐射输运方程的高维积分求解转化为低维向量运算，基于JAX AI技术栈构建高效训练框架。整体实现复用DeepRTE的物理算子模块，新增编码器模块与线性映射层，在保持高精度的同时显著降低计算复杂度。
+本节系统阐述EfficientRTE模型的代码实现与训练流程（具体流程与理论见章节~\ref{chap:prte}），核心思想是通过基函数展开与编码器-解码器架构，将含源项辐射输运方程的高维积分求解转化为低维向量运算，基于JAX AI技术栈构建高效训练框架。整体实现复用DeepRTE的物理算子模块，新增编码器模块与线性映射层，在保持高精度的同时显著降低计算复杂度。整个网络框架以及训练流程，复现脚本都作为DeepRTE的一个分支发布，具体可见开源项目\href{https://github.com/mazhengcn/deeprte/tree/efficient-rte}{DeepRTE}分支efficient-rte，
+其地址为\url{https://github.com/mazhengcn/deeprte/tree/efficient-rte}。
 
 \subsection{整体训练流程}
 
@@ -376,7 +381,6 @@ EfficientRTE的网络结构在DeepRTE基础上扩展，新增编码器模块学�
 \paragraph{衰减模块} 衰减模块与DeepRTE保持一致，整合相对位置编码、光学深度网络与多层感知机，输出包含衰减效应的潜在特征。其中相对位置编码与光学深度网络的实现与DeepRTE完全一致，详见算法\ref{alg:code-relative-position-encoding}与\ref{alg:code-optical-depth-net}。
 
 \paragraph{散射模块} 散射模块与DeepRTE保持一致，通过级联散射块模拟多步散射的固定点迭代过程，并引入残差连接保证梯度稳定。
-
 其中散射块的实现与DeepRTE完全一致，详见算法\ref{alg:code-scattering-block}。
 
 \paragraph{格林函数系数映射} 解码器的最后一步通过线性层将散射模块输出的模型维度特征映射为 $K$ 维基函数系数，实现格林函数的基函数展开。
@@ -430,7 +434,7 @@ EfficientRTE的多GPU并行策略与DeepRTE保持一致，核心采用数据并�
 
 扫掠法（Sweeping Method）是求解辐射输运方程的经典数值方法，其核心思想是沿特征线方向（由角度离散点确定）依次更新空间网格点的角通量，通过迭代收敛得到稳态解。该方法因物理直观性强、精度可控，被广泛用于生成辐射输运问题的参考解。然而，传统扫掠法主要针对CPU架构设计，存在两大瓶颈：一是空间扫掠过程中网格点的更新依赖于上游点；二是角度离散与空间离散的高维组合导致计算量巨大，且难以与基于GPU的神经网络模型在相同硬件平台上进行效率对比。
 
-为解决上述问题，本文实现了一套多GPU并行优化的快速扫掠法，通过混合策略，结合高效的设备间通信和GPU的并行计算能力，实现辐射输运方程参考解的快速生成，为DeepRTE等神经网络模型提供公平的效率对比基准。
+为解决上述问题，本文实现了一套多GPU并行优化的快速扫掠法，通过混合策略，结合高效的设备间通信和GPU的并行计算能力，实现辐射输运方程参考解的快速生成，为DeepRTE等神经网络模型提供公平的效率对比基准。这套扫掠法的GPU实现详见\href{https://github.com/mazhengcn/rte-dataset/tree/dev/src/rte_dataset/generator/python/sweeping}{rte-dataset}项目中的dev分支，具体地址为\url{https://github.com/mazhengcn/rte-dataset/tree/dev/src/rte_dataset/generator/python/sweeping}。
 
 \subsection{主要思想与设计原则}
 
@@ -463,7 +467,7 @@ EfficientRTE的多GPU并行策略与DeepRTE保持一致，核心采用数据并�
 迭代循环是扫掠法的核心，伪代码通过“全局通信-局部计算-局部扫掠-收敛检查”的流水线，实现多GPU高效协同：
 
 \paragraph{步骤1：跨设备全收集角通量}
-散射矩计算需要所有角度的角通量信息，因此首先通过$\texttt{All-Gather}$通信原语，将每个设备的局部角通量$I^{d,[\ell]}_{i,j,k}$汇总为全局角通量$I^{[\ell]}_{i,j,k'}$（$k'$覆盖全部角度）。$\texttt{All-Gather}$是GPU集群中高效的集合通信操作，可在对数时间内完成数据同步，避免点对点通信的高延迟。
+散射矩计算需要所有角度的角通量信息，因此首先通过$\texttt{All-Gather}$通信，将每个设备的局部角通量$I^{d,[\ell]}_{i,j,k}$汇总为全局角通量$I^{[\ell]}_{i,j,k'}$（$k'$覆盖全部角度）。$\texttt{All-Gather}$是GPU集群中高效的集合通信操作，可快速完成数据同步，避免点对点通信的高延迟。
 
 \paragraph{步骤2：各设备局部计算散射矩}
 拿到全局角通量后，每个设备独立计算自身负责角度的散射矩$S^{d,[\ell]}_{i,j,k}$。该步骤是“局部计算无通信”的典型场景：
@@ -479,7 +483,7 @@ EfficientRTE的多GPU并行策略与DeepRTE保持一致，核心采用数据并�
     \item 在GPU内部，将空间网格点按“波前”组织（如对角线方向的网格点），同一波前内的网格点无依赖关系，可由多个GPU线程同时更新；
     \item 扫掠更新公式通过有限差分离散，将角通量的更新转化为代数运算，适合GPU的单指令多线程（SIMT）执行模型：
           \[
-              I^{d,[\ell+1]}_{i,j,k} = \frac{c_k\frac{I^{d,[\ell]}_{i-1,j,k}}{\Delta x} + s_k\frac{I^{d,[\ell]}_{i,j-1,k}}{\Delta y} + (\mu_s)_{i,j}\,S^{d,[\ell]}_{i,j,k}}{\frac{c_k}{\Delta x} + \frac{s_k}{\Delta y} + (\mu_t)_{i,j}}
+              I^{d,[\ell+1]}_{i,j,k} = \frac{c_k\frac{I^{d,[\ell]}_{i-1,j,k}}{\Delta x} + s_k\frac{I^{d,[\ell]}_{i,j-1,k}}{\Delta y} + (\mu_s)_{i,j}\,S^{d,[\ell]}_{i,j,k}}{\frac{c_k}{\Delta x} + \frac{s_k}{\Delta y} + (\mu_t)_{i,j}}.
           \]
 \end{itemize}
 
@@ -489,12 +493,7 @@ EfficientRTE的多GPU并行策略与DeepRTE保持一致，核心采用数据并�
 \subsubsection{结果收集}
 迭代收敛后，再次通过$\texttt{All-Gather}$将各设备的局部角通量汇总，得到完整的全局角通量$I^{[\ell]}$，作为辐射输运方程的数值解输出。
 
-除上述流程外，本文的GPU并行实现还包含以下优化细节：
-\begin {enumerate}
-\item \textbf {内存访问优化}：空间网格点按行 / 列优先连续存储，确保 GPU 全局内存访问合并；
-\item \textbf {多方向扫掠并行}：对不同特征线方向启动多 GPU 线程并行执行；
-\item \textbf {通信计算重叠}：当前角度扫掠时预启动下一轮 \texttt {All-Gather} 通信，隐藏延迟。
-\end {enumerate}
+除上述流程外，本文的GPU并行实现还包含以下优化细节：空间网格点按行 / 列优先连续存储，确保 GPU 全局内存访问合并；对不同特征线方向可以启动多 GPU 线程并行执行；当前角度扫掠时预启动下一轮 \texttt {All-Gather} 通信，隐藏延迟。
 
 通过上述多GPU并行优化，本文的快速扫掠法可以快速完成数据生成，既为DeepRTE模型等提供了高效的参考解生成工具，也实现了与神经网络模型在相同GPU硬件上的公平效率对比。
 
@@ -553,7 +552,7 @@ EfficientRTE的多GPU并行策略与DeepRTE保持一致，核心采用数据并�
 
 我们选择多输入算子（Multi-Input Operator, MIO）~\cite{jin2022mionet}作为基线模型与DeepRTE对比。MIO源自DeepONet，是可接受多个输入函数的通用算子学习框架，未针对RTE进行专门设计。选择MIO的原因在于：它能处理RTE解算子依赖的多输入函数（边界条件$I_-$、源项$q$、宏观截面$\mu_t$、$\mu_s$和散射核$p$）；理论上在足够数据和容量下可逼近任意连续算子~\cite{lu2021learning}，可清晰对比DeepRTE架构的优势。
 
-关于神经算子(包括DeepRTE和MIO)的相关理论与实现细节，读者可参考章节~\ref{sec:neural-operator}，以下重点介绍MIO在RTE求解中的具体实现。
+关于神经算子(包括DeepRTE和MIO)的相关理论与实现细节，读者可参考章节~\ref{sec:neural-operator}，关于这个章节的代码实现，可见开源项目\href{https://github.com/mazhengcn/deeprte/tree/main}{DeepRTE}的MIO分支，具体地址为\url{https://github.com/mazhengcn/deeprte/tree/MIO}。以下重点介绍MIO在RTE求解中的具体实现以及特殊设计。
 
 由于MIO是通用框架，需针对RTE的输入输出特性调整。
 针对RTE解算子的多输入特性，MIO通过4个独立的分支网络分别对总截面$\mu_t$、散射截面$\mu_s$、体源项$q$、边界入射条件$I_-$进行特征提取，将所有输入映射至维度为$P$的统一特征空间：
@@ -578,8 +577,6 @@ EfficientRTE的多GPU并行策略与DeepRTE保持一致，核心采用数据并�
 \section{本章总结}
 
 本章围绕辐射输运方程神经算子求解的工程化落地、高效实现与并行优化展开，完整构建了从开发环境、数据构建、模型训练到数值基准加速的全流程技术体系。整体基于JAX技术栈实现，依托自动微分、XLA编译与原生并行原语，实现了代码模块化、训练高效化与部署标准化，为DeepRTE与EfficientRTE提供了可复现、可扩展、高性能的工程支撑。
-
-在基础架构层面，本章确立了以JAX+Flax+Optax+Orbax为核心的技术栈，通过uv依赖管理、Grain数据加载、静态图编译与模块化设计，保证了开发效率与运行效率的统一；数据集构建采用统一格式与无网格随机采样策略，实现了物理量的标准化表示与灵活加载，为模型训练提供了高质量、高吞吐的数据支撑。
 
 在模型实现层面，DeepRTE严格遵循格林函数解算子物理结构，实现了包含相对位置编码、光学深度网络、衰减模块与散射模块的完整网络，并设计了训练流程；EfficientRTE在此基础上扩展编码器-解码器架构，通过三阶段训练流程学习源项基函数与格林函数系数，将高维积分转化为低维向量运算，显著提升计算效率。两套模型均实现了多GPU数据并行。
 
