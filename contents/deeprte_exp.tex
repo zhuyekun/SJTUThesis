@@ -523,8 +523,15 @@ DeepRTE 的网络结构在设计时就有意保持了对入射边界函数 $I_{-
 \end{equation}
 最后是关于粒子近似的泛化误差项
 \begin{equation}
-    \| (\ANN_{\theta^*} - \mathcal{A}) I^{40}_{-,0.01}\|_{L^2}
-    =\Bigl\|\sum_{i=0}^{39}w_i(\ANN_{\theta^*} - \mathcal{A}) \,\delta^{\sigma_{\br}}_{\{y_i\}}(y)\Bigr\|_{L^2} \leq \sum_{i=0}^{39}|w_i|\,\|(\ANN_{\theta^*} - \mathcal{A}) \,\delta^{\sigma_{\br}}_{\{y_i\}}(y)\|_{L^2} \approx 8.385\times 10^{-5}.
+    \begin{aligned}
+        \|(\ANN_{\theta^*} - \mathcal{A}) I^{40}_{-,0.01}\|_{L^2}
+         & = \Bigl\|\sum_{i=0}^{39} w_i(\ANN_{\theta^*} - \mathcal{A})
+        \,\delta^{\sigma_{\br}}_{\{y_i\}}(y)\Bigr\|_{L^2}              \\
+         & \leq \sum_{i=0}^{39} |w_i|\,
+        \|(\ANN_{\theta^*} - \mathcal{A})
+        \,\delta^{\sigma_{\br}}_{\{y_i\}}(y)\|_{L^2}                   \\
+         & \approx 8.385\times 10^{-5}.
+    \end{aligned}
 \end{equation}
 由此得到总误差上界约为 $8.385\times 10^{-5}$。直接计算原边界条件下的推理误差
 \begin{equation}
@@ -812,4 +819,3 @@ DeepRTE 的网络结构在设计时就有意保持了对入射边界函数 $I_{-
     \item 计算效率：用户可以在细网格上训练模型以获得高精度，然后在较粗网格上进行快速预测，在精度与效率之间灵活折中；
     \item 灵活性：同一组训练好的模型参数可以迁移到具有不同网格需求的问题中使用，而无需重新训练。
 \end{enumerate}
-

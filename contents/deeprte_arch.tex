@@ -668,7 +668,7 @@ DeepRTE 的整体结构如图~\ref{fig:arch-overview} 所示，由受~\eqref{eq:
 \end{equation}
 我们观察到 $\tau(0,s'_j)$ 可以使用类似于我们衰减模块的基于注意力的架构来建模。完整的计算序列——评估 $\tau(0,s'_j)$、应用指数以及乘以 $\mus$——由神经网络端到端地近似。
 
-在具体实现中，该网络与 $\tau^{NN}_{-,t}$ 一并集成在衰减模块中，$\mathrm{OpticalDepthNet}$ 的输出为拼接后的向量 $\tau_- = \mathrm{Concat}(\tau^{NN}_{-,t}, \tau^{NN}_{-,s})$。这一设计在算法~\ref{code-optical-depth-net} 中被形式化，其中
+在具体实现中，该网络与 $\tau^{NN}_{-,t}$ 一并集成在衰减模块中，$\mathrm{OpticalDepthNet}$ 的输出为拼接后的向量 $\tau_- = \mathrm{Concat}(\tau^{NN}_{-,t}, \tau^{NN}_{-,s})$。这一设计在算法~\ref{alg:code-optical-depth-net} 中被形式化，其中
 \begin{equation}
     \tau_- = \mathrm{Concat}\left(\tau^{NN}_{-,t}, \tau^{NN}_{-,s}\right) = \mathrm{OpticalDepthNet}\left(\br,\bOmega; \{\br^{\mathrm{mesh}}_i\}, \left\{(\mu_t^{\mathrm{mesh}}, \mu_s^{\mathrm{mesh}})_i\right\}\right) \in \mathbb{R}^{d_{\tau}},
 \end{equation}

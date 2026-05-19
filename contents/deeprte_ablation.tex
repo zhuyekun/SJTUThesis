@@ -85,7 +85,7 @@ DeepRTE 的架构设计旨在通过将 RTE 解算子分解为模拟沿特征线�
 \begin{equation}
     G_{\cL}^{\text{NN}}(\br,\bOmega, \br', \bOmega';\mut,\mus) = \bG^{\text{NN}}(\br,\bOmega, \br', \bOmega', \tau^{\text{NN}}_{-})\bm{W}\in\mathbb{R}^1,
 \end{equation}
-其中 $\tau^{\text{NN}}_{-}$ 在算法~\ref{alg:optical-depth-net} 中定义。$\bG^{\text{NN}}$ 的输出维度为 $d_\text{model}$，$\bm{W} \in \mathbb{R}^{d_{\text{model}}\times 1}$ 是一个可学习的权重矩阵，用于将输出投影到单个输出通道，类似于~\eqref{scattering_layer} 中的 $\bm{W}$。
+其中 $\tau^{\text{NN}}_{-}$ 在算法~\ref{alg:code-optical-depth-net} 中定义。$\bG^{\text{NN}}$ 的输出维度为 $d_\text{model}$，$\bm{W} \in \mathbb{R}^{d_{\text{model}}\times 1}$ 是一个可学习的权重矩阵，用于将输出投影到单个输出通道，类似于~\eqref{scattering_layer} 中的 $\bm{W}$。
 
 与 $\J$ 类似，我们将它与没有任何 RTE 专用架构的 $\text{MIO}_{\cL}$ 进行比较：
 \begin{equation}
